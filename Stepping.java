@@ -10,7 +10,6 @@ import java.io.*;
 import java.net.*;
 
 public class Stepping {
-
    final static int EAST   = 0;
    final static int NORTH  = 1;
    final static int WEST   = 2;

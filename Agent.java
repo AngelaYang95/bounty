@@ -1,5 +1,5 @@
 /*********************************************
- *  Agent.java 
+ *  Agent.java
  *  Sample Agent for Text-Based Adventure Game
  *  COMP3411 Artificial Intelligence
  *  UNSW Session 1, 2016
@@ -11,17 +11,17 @@ import java.net.*;
 
 public class Agent {
 
-   final static int EAST   = 0;
-   final static int NORTH  = 1;
-   final static int WEST   = 2;
-   final static int SOUTH  = 3;
-   
+   final static int NORTH  = 0;
+   final static int EAST   = 1;
+   final static int SOUTH  = 2;
+   final static int WEST   = 3;
+
    final static int WORLD_MAP_LENGTH = 159;
    final static int ENV_MAX_LENGTH = 80;
    final static int WINDOW_SIZE = 5;
    final static int AGENT_START_INDEX = 79;
    final static int VIEW_OFFSET = 2;
-   
+
    final static char UNKNOWN = '?';
    final static char MOVE_FORWARD = 'f';
    final static char TURN_LEFT = 'l';
@@ -32,23 +32,23 @@ public class Agent {
    final static char WALL = '*';
    final static char WATER = '~';
    final static char SPACE = ' ';
-      
-   private char[][] worldMap = new char[WORLD_MAP_LENGTH][WORLD_MAP_LENGTH]; 
+
+   private char[][] worldMap = new char[WORLD_MAP_LENGTH][WORLD_MAP_LENGTH];
    private int initialRow, initialCol;
    char[] choiceOfMoves = {MOVE_FORWARD, TURN_LEFT, TURN_RIGHT};
-   
+
    // Current position and direction of the agent.
    private int currRow,currCol,currDir;
-  
+
    // Equipment the agent is currently holding.
    private boolean hasAxe;
    private boolean hasKey;
    private boolean hasGold;
-   private int numSteppingStones; 
-   
+   private int numSteppingStones;
+
    private Coordinate goldPosition;
    private Queue<Character> journey = new LinkedList<>();
-   
+
    public Agent() {
 	   initialRow = currRow = AGENT_START_INDEX;
 	   initialCol = currCol = AGENT_START_INDEX;
@@ -57,13 +57,13 @@ public class Agent {
 	   hasKey = false;
 	   hasGold = false;
 	   numSteppingStones = 0;
-	   
+
 	   // Initialize the World Map to be all unknowns.
 	   for(char[] row: worldMap) {
 		   Arrays.fill(row, UNKNOWN);
 	   }
    }
-   
+
    /**
     * Given a view of it's surroundings, returns an action.
     */
@@ -76,15 +76,16 @@ public class Agent {
          System.out.println ("IO error:" + e );
       }
 	  scanView(view);
-	  
+
 	  // Decision making for what action to take.
 	  // Currently just randomly looks around trying not to die.
 	  char action;
 	  action = conquerTerritory();
 	  updateNewPosition(action);
+    System.out.println("CurrDir is " + currDir);
 	  return action;
    }
-   
+
    /**
     * Scans the given 5x5 view and updates AI's map with information.
     * TODO: Change so it doesn't constantly rescan already know information.
@@ -98,39 +99,48 @@ public class Agent {
 			   } else {
 				   updateWorld(i, j, value);
 			   }
-			   
+
 			   // Store position of gold.
 			   if(value == GOLD && goldPosition == null) {
-			   		// INCORRECT. NEDEDS TO BE TURNED INTO WORLD MAP INDEX.
-			   		goldPosition = new Coordinate(i,j, NORTH); 
+			   		goldPosition = convertToWorldCoordinate(i,j, NORTH);
 			   }
 		   }
 	   }
    }
-   
+
    /**
     * Updates the world map with new information on the environment.
     */
    private void updateWorld(int xInView, int yInView, char value) {
+     Coordinate pointInWorld = convertToWorldCoordinate(xInView, yInView, currDir);
+     int rowInWorld = pointInWorld.getX();
+     int colInWorld = pointInWorld.getY();
+     worldMap[rowInWorld][colInWorld] = value;
+   }
+
+   /**
+    * Updates the world map with new information on the environment.
+    */
+   private Coordinate convertToWorldCoordinate(int xInView, int yInView, int direction) {
 	   // Rotate the view and its indices to face NORTH.
 	   switch(currDir) {
 	   		case EAST:
-	   			xInView = WINDOW_SIZE - xInView;
+	   			xInView = Math.abs(xInView - 4);
 	   			break;
 	   		case SOUTH:
-	   			xInView = WINDOW_SIZE - xInView;
-	   			yInView = WINDOW_SIZE - yInView;
+	   			xInView = Math.abs(xInView - 4);
+	   			yInView = Math.abs(yInView - 4);
 	   			break;
 	   		case WEST:
-	   			yInView = WINDOW_SIZE - yInView;
+	   			yInView = Math.abs(yInView - 4);
 	   }
-	   
+
 	   // Calculate the corresponding indices in world map.
 	   int rowInWorld = xInView - VIEW_OFFSET + currRow;
 	   int colInWorld = yInView - VIEW_OFFSET + currCol;
-	   worldMap[rowInWorld][colInWorld] = value;
+     return new Coordinate(rowInWorld, colInWorld, direction);
    }
-   
+
    /**
     * Basic strategy to get AI to explore new areas of the environment.
     * TODO: change to iterative Deepening Search/ BFS for UNKNOWN.
@@ -140,44 +150,53 @@ public class Agent {
 	  char action = choiceOfMoves[rn.nextInt(3)];
  	  if(action == MOVE_FORWARD) {
 		  char itemInFront = getObjectInFront(currRow, currCol, currDir);
+      System.out.println("Item in front is " + itemInFront);
 		  if(itemInFront == WATER) {	// DON'T DIE.
 		  	action = TURN_LEFT;
 		  }
 	  }
 	  return action;
    }
-   
+
    /**
     * Given two coordinates and a direction, finds what is in front of this position.
     */
-   private char getObjectInFront(int x, int y, int direction) {
+   private char getObjectInFront(int xInWorld, int yInWorld, int direction) {
 		switch (direction) {
 		case Agent.NORTH:
-			x--;
+			xInWorld--;
 			break;
 		case Agent.EAST:
-			y++;
+			yInWorld++;
 			break;
 		case Agent.SOUTH:
-			x++;
+			xInWorld++;
 			break;
 		case Agent.WEST:
-			y--;
+			yInWorld--;
 			break;
 		}
-		
-		if(x < 0 || x >= WORLD_MAP_LENGTH || y < 0 || y >= WORLD_MAP_LENGTH) {
+
+		if(xInWorld < 0 || xInWorld >= WORLD_MAP_LENGTH ||
+       yInWorld < 0 || yInWorld >= WORLD_MAP_LENGTH) {
 			return WATER;
 		} else {
-			return worldMap[x][y];
+      char[] col = worldMap[xInWorld];
+      for(int i = yInWorld - 2; i < yInWorld + 2; i++) {
+        System.out.println(col[i]);
+      }
+			return worldMap[xInWorld][yInWorld];
 		}
    }
-   
+
    /**
     * Updates agent with it's own location for the move it's about to make.
     */
    private void updateNewPosition(char action) {
-	   if(action == TURN_LEFT || action == TURN_RIGHT) {
+	   if(action == TURN_LEFT) {
+       // Java's % gives only remainder.
+       currDir = ((currDir - 1) % 4 + 4) % 4;
+     } else if (action == TURN_RIGHT) {
 		   currDir = (currDir + 1) % 4;
 	   } else if (action == MOVE_FORWARD) {
 		   if(currDir == NORTH) {
@@ -222,7 +241,7 @@ public class Agent {
       }
 
  	  // scan 5-by-5 window around current location
-      try { 
+      try {
          while( true ) {
             for( i=0; i < 5; i++ ) {
                for( j=0; j < 5; j++ ) {
@@ -235,7 +254,7 @@ public class Agent {
                   }
                }
             }
-            
+
             agent.print_view(view); // COMMENT THIS OUT BEFORE SUBMISSION
             agent.scanView(view);
             agent.show_world();
@@ -254,7 +273,7 @@ public class Agent {
          catch( IOException e ) {}
       }
    }
-   
+
    //______________________________
    // PRINT FUNCTIONS TO BE REMOVED
    //______________________________
@@ -269,7 +288,7 @@ public class Agent {
    			System.out.println();
    		}
    }
-   
+
    /**
     * Prints the current view to console.
     */
