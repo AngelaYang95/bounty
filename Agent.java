@@ -26,8 +26,12 @@ public class Agent {
    final static char MOVE_FORWARD = 'f';
    final static char TURN_LEFT = 'l';
    final static char TURN_RIGHT = 'r';
+
    final static char STEPPING_STONE = 'o';
+   final static char AXE = 'a';
+   final static char KEY = 'k';
    final static char GOLD = 'g';
+
    final static char TREE = 'T';
    final static char WALL = '*';
    final static char WATER = '~';
@@ -45,8 +49,11 @@ public class Agent {
    private boolean hasKey;
    private boolean hasGold;
    private int numSteppingStones;
+   // Only tracks location of 1 of each type atm.
+   private Map<Character, Coordinate> spottedEquipment = new HashMap<>();
 
    private Coordinate goldPosition;
+   private boolean hasWonGame;
    private Queue<Character> journey = new LinkedList<>();
 
    public Agent() {
@@ -57,6 +64,7 @@ public class Agent {
 	   hasKey = false;
 	   hasGold = false;
 	   numSteppingStones = 0;
+     hasWonGame = false;
 
 	   // Initialize the World Map to be all unknowns.
 	   for(char[] row: worldMap) {
@@ -82,7 +90,6 @@ public class Agent {
 	  char action;
 	  action = conquerTerritory();
 	  updateNewPosition(action);
-    System.out.println("CurrDir is " + currDir);
 	  return action;
    }
 
@@ -103,7 +110,10 @@ public class Agent {
 			   // Store position of gold.
 			   if(value == GOLD && goldPosition == null) {
 			   		goldPosition = convertToWorldCoordinate(i,j, NORTH);
-			   }
+			   } else if (value == STEPPING_STONE || value == KEY || value == AXE) {
+           Coordinate location = convertToWorldCoordinate(i, j, NORTH);
+           spottedEquipment.put(value, location);
+         }
 		   }
 	   }
    }
@@ -150,12 +160,24 @@ public class Agent {
 	  char action = choiceOfMoves[rn.nextInt(3)];
  	  if(action == MOVE_FORWARD) {
 		  char itemInFront = getObjectInFront(currRow, currCol, currDir);
-      System.out.println("Item in front is " + itemInFront);
 		  if(itemInFront == WATER) {	// DON'T DIE.
 		  	action = TURN_LEFT;
 		  }
 	  }
 	  return action;
+   }
+
+   /**
+    * Given an x and y point returns a path from the agent's current location to
+    * that coordinate.
+    * TODO: Get this working by Saturday.
+    */
+   private List<Coordinate> findPathToCoordinate(Coordinate destination) {
+      List<Coordinate> path = new LinkedList<>();
+      int destX = destination.getX();
+      int destY = destination.getY();
+      
+      return path;
    }
 
    /**
@@ -181,10 +203,6 @@ public class Agent {
        yInWorld < 0 || yInWorld >= WORLD_MAP_LENGTH) {
 			return WATER;
 		} else {
-      char[] col = worldMap[xInWorld];
-      for(int i = yInWorld - 2; i < yInWorld + 2; i++) {
-        System.out.println(col[i]);
-      }
 			return worldMap[xInWorld][yInWorld];
 		}
    }
@@ -194,8 +212,7 @@ public class Agent {
     */
    private void updateNewPosition(char action) {
 	   if(action == TURN_LEFT) {
-       // Java's % gives only remainder.
-       currDir = ((currDir - 1) % 4 + 4) % 4;
+       currDir = ((currDir - 1) % 4 + 4) % 4;  // Java's % gives only remainder.
      } else if (action == TURN_RIGHT) {
 		   currDir = (currDir + 1) % 4;
 	   } else if (action == MOVE_FORWARD) {
