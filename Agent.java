@@ -26,6 +26,8 @@ public class Agent {
    final static char MOVE_FORWARD = 'f';
    final static char TURN_LEFT = 'l';
    final static char TURN_RIGHT = 'r';
+   final static char CUT_DOWN = 'c';
+   final static char OPEN_DOOR = 'u';
 
    final static char STEPPING_STONE = 'o';
    final static char AXE = 'a';
@@ -36,6 +38,7 @@ public class Agent {
    final static char WALL = '*';
    final static char WATER = '~';
    final static char SPACE = ' ';
+   final static char DOOR = '-';
 
    private char[][] worldMap = new char[WORLD_MAP_LENGTH][WORLD_MAP_LENGTH];
    private int initialRow, initialCol;
@@ -55,7 +58,7 @@ public class Agent {
    private Coordinate goldPosition;
    private boolean goldIsReachable;
    private boolean hasWonGame;
-   private Queue<Character> journey = new LinkedList<>();
+   private LinkedList<Character> journey = new LinkedList<>();
 
    public Agent() {
 	   initialRow = currRow = AGENT_START_INDEX;
@@ -88,24 +91,24 @@ public class Agent {
 	  scanView(view);
 
 	  // Decision making for what action to take.
-	  // Currently just randomly looks around trying not to die.
-    List<Coordinate> journey = conquerTerritory();
-    char action = getRandomAction();
-
-    /*if(!spottedEquipment.keySet().isEmpty()) {
-       for(Map.Entry<Character, Coordinate> toolSet : spottedEquipment.entrySet()) {
-         Character tool = toolSet.getKey();
-         Coordinate toolLocation = toolSet.getValue();
-         List<Coordinate> path = findPathToCoordinate(toolLocation);
-         System.out.println(tool);
-         if(!path.isEmpty()) {
-           path.remove(0);
-           journey = path;
-           spottedEquipment.remove(tool);
-           break;
-         }
-       }
-    }*/
+	  // Currently explores new territory trying not to die.
+    // Reverts to random movement if no new terriory reachable.
+    char action;
+    if(journey.isEmpty()) {
+      String path = conquerTerritory();
+      if(path == "") {
+        action = getRandomAction();
+      } else {
+        char[] pathArray = path.toCharArray();
+        for(char pathAction: pathArray) {
+          journey.add(pathAction);
+        }
+        journey.removeLast();
+        action = journey.removeFirst();
+      }
+    } else {
+      action = journey.removeFirst();
+    }
 	  updateNewPosition(action);
 	  return action;
    }
@@ -149,17 +152,20 @@ public class Agent {
     * Updates the world map with new information on the environment.
     */
    private Coordinate convertToWorldCoordinate(int xInView, int yInView) {
+     int temp = xInView;
 	   // Rotate the view and its indices to face NORTH.
 	   switch(currDir) {
 	   		case EAST:
-	   			xInView = Math.abs(xInView - 4);
+          xInView = yInView;
+          yInView = Math.abs(temp - 4);
 	   			break;
 	   		case SOUTH:
 	   			xInView = Math.abs(xInView - 4);
 	   			yInView = Math.abs(yInView - 4);
 	   			break;
 	   		case WEST:
-	   			yInView = Math.abs(yInView - 4);
+	   			xInView = Math.abs(yInView - 4);
+          yInView = temp;
 	   }
 
 	   // Calculate the corresponding indices in world map.
@@ -170,12 +176,68 @@ public class Agent {
 
    /**
     * Basic strategy to get AI to explore new areas of the environment.
-    * TODO: change to iterative Deepening Search/ BFS for UNKNOWN.
-    * Returns path.
+    * TODO: Currently BFS for UNKNOWN.
+    * Returns path as list of moves.
+    * Doesn't take optimal path to do 180 turn, it'd take 6 moves instead of 2.
     */
-   private List<Coordinate> conquerTerritory() {
-    List<Coordinate> actionSequence = new LinkedList<>();
-	  return actionSequence;
+   private String conquerTerritory() {
+    // Map.Entry<String,Integer> entry = new AbstractMap.SimpleEntry<String, Integer>("exmpleString", 42);
+    List<Coordinate> visited = new LinkedList<>();
+    // Can be priority queue later.
+    Queue<State> toVisit = new LinkedList<State>();
+
+    Coordinate currentPoint = new Coordinate(currRow, currCol);
+    State startState = new State(currentPoint, currDir, 0, "");
+    toVisit.add(startState);
+    String path = "";
+    // BFS
+    boolean found = false;
+    while(!found && !toVisit.isEmpty()) {
+        State currentState = toVisit.poll();
+        Coordinate location = currentState.getCoordinate();
+        String actionSequence = currentState.getSequence();
+        int prevDirection = currentState.getDirection();
+        int numActions = currentState.getNumActions();
+
+        if(getObjectAtPoint(location) == UNKNOWN) {
+            //System.out.println("UNKNOWN FOUND");
+            path = actionSequence;
+            found = true;
+        } else {
+          int x = location.getX();
+          int y = location.getY();
+          //System.out.println(x + "," + y);
+          char obj = getObjectInFront(x, y, prevDirection);
+          //System.out.println("OBJ IN FRONT IS" + obj);
+          for(char action: choiceOfMoves) {
+              if((action == MOVE_FORWARD) && (obj == WATER || obj == WALL ||
+                                              obj == TREE  || obj == DOOR)) {
+                //check it doesn't kill agent.
+              } else {
+                Coordinate stateLoc = new Coordinate(x, y);
+                State nextState = new State(stateLoc, prevDirection, numActions,
+                                               actionSequence);
+                nextState.addMove(action);
+                stateLoc = nextState.getCoordinate();
+                if(!visited.contains(stateLoc)) {
+                  toVisit.add(nextState);
+                }
+              }
+          }
+        }
+        // Added afterwards to allow states facing left and right to be added.
+        visited.add(location);
+    }
+	  return path;
+   }
+
+   /**
+    * Given a valid coordinate, return what is known to be at that point.
+    */
+   private char getObjectAtPoint(Coordinate point) {
+     int x = point.getX();
+     int y = point.getY();
+     return worldMap[x][y];
    }
 
    /**
@@ -184,11 +246,16 @@ public class Agent {
    private char getRandomAction() {
      Random rn = new Random();
      char action = choiceOfMoves[rn.nextInt(3)];
-       if(action == MOVE_FORWARD) {
-       char itemInFront = getObjectInFront(currRow, currCol, currDir);
-       if(itemInFront == WATER) {	// DON'T DIE.
-         action = TURN_LEFT;
-       }
+     if(action == MOVE_FORWARD) {
+         char itemInFront = getObjectInFront(currRow, currCol, currDir);
+         if(itemInFront != SPACE) { // BE CAREFUL DON'T DIE.
+            action = TURN_LEFT;
+            if(itemInFront == TREE && hasAxe) {
+                action = CUT_DOWN;
+            } else if(itemInFront == DOOR && hasKey) {
+                action = OPEN_DOOR;
+            }
+         }
      }
      return action;
    }
@@ -206,40 +273,52 @@ public class Agent {
    }
 
    /**
-    * Given two coordinates and a direction, finds what is in front of this position.
+    * Given two coordinates and a direction, finds what is in front of this
+    * position.
     */
    private char getObjectInFront(int xInWorld, int yInWorld, int direction) {
-		switch (direction) {
-		case Agent.NORTH:
-			xInWorld--;
-			break;
-		case Agent.EAST:
-			yInWorld++;
-			break;
-		case Agent.SOUTH:
-			xInWorld++;
-			break;
-		case Agent.WEST:
-			yInWorld--;
-			break;
-		}
+     Coordinate pointInFront = getCoordinateNextdoor(xInWorld, yInWorld, direction);
+     xInWorld = pointInFront.getX();
+     yInWorld = pointInFront.getY();
+  		if(xInWorld < 0 || xInWorld >= WORLD_MAP_LENGTH ||
+         yInWorld < 0 || yInWorld >= WORLD_MAP_LENGTH) {
+  			return WATER;
+  		} else {
+  			return worldMap[xInWorld][yInWorld];
+  		}
+   }
 
-		if(xInWorld < 0 || xInWorld >= WORLD_MAP_LENGTH ||
-       yInWorld < 0 || yInWorld >= WORLD_MAP_LENGTH) {
-			return WATER;
-		} else {
-			return worldMap[xInWorld][yInWorld];
-		}
+   /**
+    * Gives coordinate next to point in a given direction.
+    */
+   private Coordinate getCoordinateNextdoor(int xInWorld, int yInWorld, int direction) {
+     switch (direction) {
+       case Agent.NORTH:
+         xInWorld--;
+         break;
+       case Agent.EAST:
+         yInWorld++;
+         break;
+       case Agent.SOUTH:
+         xInWorld++;
+         break;
+       case Agent.WEST:
+         yInWorld--;
+         break;
+     }
+     return new Coordinate(xInWorld, yInWorld);
    }
 
    /**
     * Updates agent with it's own location for the move it's about to make.
+    * Trusting that AI doesn't make any false moves.
+    * AI attempting to walk through wall will break it's worldMap.
     */
    private void updateNewPosition(char action) {
 	   if(action == TURN_LEFT) {
-       currDir = ((currDir - 1) % 4 + 4) % 4;  // Java's % gives only remainder.
+       currDir = ((currDir - 1) + 8) % 4;  // Java's % gives only remainder.
      } else if (action == TURN_RIGHT) {
-		   currDir = (currDir + 1) % 4;
+		   currDir = ((currDir + 1) + 4) % 4;
 	   } else if (action == MOVE_FORWARD) {
 		   if(currDir == NORTH) {
 			   currRow--;
@@ -250,7 +329,9 @@ public class Agent {
 		   } else {
 			   currCol--;
 		   }
-	   }
+	   } else {
+       // Catching actions for cutting tree etc.
+     }
    }
 
    public static void main( String[] args )
@@ -323,12 +404,29 @@ public class Agent {
     * Prints to console everything the AI knows about its environment.
     */
    void show_world() {
-   		for(char[] row: worldMap) {
-   			for(char c: row) {
-   				System.out.print(c);
-   			}
-   			System.out.println();
-   		}
+      for(int i = 0; i < WORLD_MAP_LENGTH; i++) {
+        for(int j = 0; j < WORLD_MAP_LENGTH; j++) {
+          if(i == currRow && j == currCol) {
+              switch(currDir) {
+              case NORTH:
+                System.out.print('^');
+                break;
+              case SOUTH:
+                System.out.print('v');
+                break;
+              case EAST:
+                System.out.print('>');
+                break;
+              case WEST:
+                System.out.print('<');
+                break;
+              }
+          } else {
+             System.out.print(worldMap[i][j]);
+          }
+        }
+        System.out.println();
+      }
    }
 
    /**

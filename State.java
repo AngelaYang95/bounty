@@ -1,3 +1,6 @@
+/**
+ * Structure to hold data in search finding algorithms.
+ */
 public class State implements Comparable<State>{
   private Coordinate location;
   private int direction;
@@ -5,13 +8,16 @@ public class State implements Comparable<State>{
   private String actionSequence;
   private int numActions;
 
-  public State(Coordinate start, int startDir) {
+  public State(Coordinate start, int startDir, int numActions, String actions) {
     this.direction = startDir;
     location = start;
-    numActions = 0;
-    actionSequence = "";
+    this.numActions = numActions;
+    actionSequence = actions;
   }
 
+  /**
+   * Updates entire state with new action.
+   */
   public void addMove(char action) {
     actionSequence += action;
     numActions++;
@@ -28,8 +34,20 @@ public class State implements Comparable<State>{
     }
   }
 
+  public Coordinate getCoordinate() {
+    return location;
+  }
+
   public int getDirection() {
     return direction;
+  }
+
+  public String getSequence() {
+    return actionSequence;
+  }
+
+  public int getNumActions() {
+    return numActions;
   }
 
   // Used to prioritise States in search.
@@ -45,11 +63,11 @@ public class State implements Comparable<State>{
 
   private void turnLeft() {
     direction--;
-    direction = (direction % 4 + 4) % 4;
+    direction = (direction + 8) % 4;
   }
 
   private void turnRight() {
-    direction++;
+    direction = direction + 1 + 4;
     direction %= 4;
   }
 }
