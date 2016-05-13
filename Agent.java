@@ -53,6 +53,7 @@ public class Agent {
    private Map<Character, Coordinate> spottedEquipment = new HashMap<>();
 
    private Coordinate goldPosition;
+   private boolean goldIsReachable;
    private boolean hasWonGame;
    private Queue<Character> journey = new LinkedList<>();
 
@@ -64,6 +65,7 @@ public class Agent {
 	   hasKey = false;
 	   hasGold = false;
 	   numSteppingStones = 0;
+     goldIsReachable = false;
      hasWonGame = false;
 
 	   // Initialize the World Map to be all unknowns.
@@ -87,8 +89,23 @@ public class Agent {
 
 	  // Decision making for what action to take.
 	  // Currently just randomly looks around trying not to die.
-	  char action;
-	  action = conquerTerritory();
+    List<Coordinate> journey = conquerTerritory();
+    char action = getRandomAction();
+
+    /*if(!spottedEquipment.keySet().isEmpty()) {
+       for(Map.Entry<Character, Coordinate> toolSet : spottedEquipment.entrySet()) {
+         Character tool = toolSet.getKey();
+         Coordinate toolLocation = toolSet.getValue();
+         List<Coordinate> path = findPathToCoordinate(toolLocation);
+         System.out.println(tool);
+         if(!path.isEmpty()) {
+           path.remove(0);
+           journey = path;
+           spottedEquipment.remove(tool);
+           break;
+         }
+       }
+    }*/
 	  updateNewPosition(action);
 	  return action;
    }
@@ -109,9 +126,9 @@ public class Agent {
 
 			   // Store position of gold.
 			   if(value == GOLD && goldPosition == null) {
-			   		goldPosition = convertToWorldCoordinate(i,j, NORTH);
+			   		goldPosition = convertToWorldCoordinate(i,j);
 			   } else if (value == STEPPING_STONE || value == KEY || value == AXE) {
-           Coordinate location = convertToWorldCoordinate(i, j, NORTH);
+           Coordinate location = convertToWorldCoordinate(i, j);
            spottedEquipment.put(value, location);
          }
 		   }
@@ -122,7 +139,7 @@ public class Agent {
     * Updates the world map with new information on the environment.
     */
    private void updateWorld(int xInView, int yInView, char value) {
-     Coordinate pointInWorld = convertToWorldCoordinate(xInView, yInView, currDir);
+     Coordinate pointInWorld = convertToWorldCoordinate(xInView, yInView);
      int rowInWorld = pointInWorld.getX();
      int colInWorld = pointInWorld.getY();
      worldMap[rowInWorld][colInWorld] = value;
@@ -131,7 +148,7 @@ public class Agent {
    /**
     * Updates the world map with new information on the environment.
     */
-   private Coordinate convertToWorldCoordinate(int xInView, int yInView, int direction) {
+   private Coordinate convertToWorldCoordinate(int xInView, int yInView) {
 	   // Rotate the view and its indices to face NORTH.
 	   switch(currDir) {
 	   		case EAST:
@@ -148,23 +165,32 @@ public class Agent {
 	   // Calculate the corresponding indices in world map.
 	   int rowInWorld = xInView - VIEW_OFFSET + currRow;
 	   int colInWorld = yInView - VIEW_OFFSET + currCol;
-     return new Coordinate(rowInWorld, colInWorld, direction);
+     return new Coordinate(rowInWorld, colInWorld);
    }
 
    /**
     * Basic strategy to get AI to explore new areas of the environment.
     * TODO: change to iterative Deepening Search/ BFS for UNKNOWN.
+    * Returns path.
     */
-   private char conquerTerritory() {
-	  Random rn = new Random();
-	  char action = choiceOfMoves[rn.nextInt(3)];
- 	  if(action == MOVE_FORWARD) {
-		  char itemInFront = getObjectInFront(currRow, currCol, currDir);
-		  if(itemInFront == WATER) {	// DON'T DIE.
-		  	action = TURN_LEFT;
-		  }
-	  }
-	  return action;
+   private List<Coordinate> conquerTerritory() {
+    List<Coordinate> actionSequence = new LinkedList<>();
+	  return actionSequence;
+   }
+
+   /**
+    * Gives a random action that won't result in agent dying.
+    */
+   private char getRandomAction() {
+     Random rn = new Random();
+     char action = choiceOfMoves[rn.nextInt(3)];
+       if(action == MOVE_FORWARD) {
+       char itemInFront = getObjectInFront(currRow, currCol, currDir);
+       if(itemInFront == WATER) {	// DON'T DIE.
+         action = TURN_LEFT;
+       }
+     }
+     return action;
    }
 
    /**
@@ -176,7 +202,6 @@ public class Agent {
       List<Coordinate> path = new LinkedList<>();
       int destX = destination.getX();
       int destY = destination.getY();
-      
       return path;
    }
 
@@ -274,7 +299,7 @@ public class Agent {
 
             agent.print_view(view); // COMMENT THIS OUT BEFORE SUBMISSION
             agent.scanView(view);
-            agent.show_world();
+            agent.show_world(); // COMMENT THIS OUT BEFORE SUBMISSION
             action = agent.get_action(view);
             out.write( action );
          }

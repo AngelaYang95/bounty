@@ -6,12 +6,10 @@ public class Coordinate {
 
 	private int x;
 	private int y;
-	private int direction;
 
-	public Coordinate(int x, int y, int direction) {
+	public Coordinate(int x, int y) {
 		this.x = x;
 		this.y = y;
-		this.direction = direction;
 	}
 
 	public int getX() {
@@ -22,26 +20,8 @@ public class Coordinate {
 		return y;
 	}
 
-	public int getDirection() {
-		return direction;
-	}
-
-	public int getDir() {
-		return direction;
-	}
-
-	public void turnLeft() {
-		direction--;
-		direction = (direction % 4 + 4) % 4;
-	}
-
-	public void turnRight() {
-		direction++;
-		direction %= 4;
-	}
-
-	public void moveForward() {
-		switch (direction) {
+	public void takeStep(int currDir) {
+		switch (currDir) {
 		case Agent.NORTH:
 			x--;
 			break;
@@ -68,8 +48,7 @@ public class Coordinate {
 		}
 		Coordinate other = (Coordinate) obj;
 		if(other.getX() == this.x &&
-		   other.getY() == this.y &&
-		   other.getDirection() == this.direction) {
+		   other.getY() == this.y) {
 			return true;
 		}
 		return false;
