@@ -97,16 +97,19 @@ public class Agent {
     if(journey.isEmpty()) {
       String path = conquerTerritory();
       if(path == "") {
+        System.out.println("RANDOM");
         action = getRandomAction();
       } else {
         char[] pathArray = path.toCharArray();
         for(char pathAction: pathArray) {
           journey.add(pathAction);
+          System.out.print(pathAction);
         }
         journey.removeLast();
         action = journey.removeFirst();
       }
     } else {
+      System.out.println("CONTINUING JOURNEY");
       action = journey.removeFirst();
     }
 	  updateNewPosition(action);
@@ -176,57 +179,35 @@ public class Agent {
 
    /**
     * Basic strategy to get AI to explore new areas of the environment.
-    * TODO: Currently BFS for UNKNOWN.
+    * Currently Uni-cost/bfs for UNKNOWN.
+    * Maybe change to iterative deepening.
     * Returns path as list of moves.
-    * Doesn't take optimal path to do 180 turn, it'd take 6 moves instead of 2.
+    * TODO: *v* if trapped, start state should be an 180' turn i.e. rr.
+    *       ***
     */
    private String conquerTerritory() {
-    // Map.Entry<String,Integer> entry = new AbstractMap.SimpleEntry<String, Integer>("exmpleString", 42);
-    List<Coordinate> visited = new LinkedList<>();
+    // Speed up by changing to 2D array means immediate lookup. But space.
+    Map<Integer, Map<Integer, String>> visited = new HashMap<>();
     // Can be priority queue later.
     Queue<State> toVisit = new LinkedList<State>();
-
     Coordinate currentPoint = new Coordinate(currRow, currCol);
     State startState = new State(currentPoint, currDir, 0, "");
     toVisit.add(startState);
     String path = "";
     // BFS
-    boolean found = false;
-    while(!found && !toVisit.isEmpty()) {
+    while(!toVisit.isEmpty()) {
         State currentState = toVisit.poll();
         Coordinate location = currentState.getCoordinate();
         String actionSequence = currentState.getSequence();
-        int prevDirection = currentState.getDirection();
-        int numActions = currentState.getNumActions();
-
+        // int prevDirection = currentState.getDirection();
+        // int numActions = currentState.getNumActions();
         if(getObjectAtPoint(location) == UNKNOWN) {
-            //System.out.println("UNKNOWN FOUND");
             path = actionSequence;
-            found = true;
-        } else {
-          int x = location.getX();
-          int y = location.getY();
-          //System.out.println(x + "," + y);
-          char obj = getObjectInFront(x, y, prevDirection);
-          //System.out.println("OBJ IN FRONT IS" + obj);
-          for(char action: choiceOfMoves) {
-              if((action == MOVE_FORWARD) && (obj == WATER || obj == WALL ||
-                                              obj == TREE  || obj == DOOR)) {
-                //check it doesn't kill agent.
-              } else {
-                Coordinate stateLoc = new Coordinate(x, y);
-                State nextState = new State(stateLoc, prevDirection, numActions,
-                                               actionSequence);
-                nextState.addMove(action);
-                stateLoc = nextState.getCoordinate();
-                if(!visited.contains(stateLoc)) {
-                  toVisit.add(nextState);
-                }
-              }
-          }
+            break;
         }
+        toVisit = considerChoices(currentState, visited, toVisit);
         // Added afterwards to allow states facing left and right to be added.
-        visited.add(location);
+        visited = addToVisitedMap(visited, currentState);
     }
 	  return path;
    }
@@ -263,13 +244,152 @@ public class Agent {
    /**
     * Given an x and y point returns a path from the agent's current location to
     * that coordinate.
-    * TODO: Get this working by Saturday.
+    * TODO: Bi-directional search with A*. BFS first then update to A*.
+    *
     */
-   private List<Coordinate> findPathToCoordinate(Coordinate destination) {
-      List<Coordinate> path = new LinkedList<>();
-      int destX = destination.getX();
-      int destY = destination.getY();
-      return path;
+   private String findPathToCoordinate(Coordinate destination) {
+      // Structures needed for Agent's side of search.
+      Map<Integer, Map<Integer, String>> visitedByAgent = new HashMap<>();
+      Queue<State> agentToVisit = new PriorityQueue<State>();
+      Coordinate agentCurrPoint = new Coordinate(currRow, currCol);
+      State currAgentState = new State(agentCurrPoint, currDir, 0, "");
+      agentToVisit.add(currAgentState);
+      String agentPath = "";
+
+      // Structures needed for Goal side of search.
+      Map<Integer, Map<Integer, String>> visitedByGoal = new HashMap<>();
+      Queue<State> goalToVisit = new PriorityQueue<State>();
+      // TODO: Fix "direction" for goal.
+      State currGoalState = new State(destination, NORTH, 0, "");
+      goalToVisit.add(currGoalState);
+      String goalPath = "";
+
+      while(!agentToVisit.isEmpty() && !goalToVisit.isEmpty()) {
+        if(!agentToVisit.isEmpty()) {
+          currAgentState = agentToVisit.poll();
+          if(isVisited(visitedByGoal, currAgentState.getCoordinate()) ||
+             sameLocation(currAgentState, currGoalState)) {
+              int agentXCo = currAgentState.getX();
+              int agentYCo = currAgentState.getY();
+              goalPath = visitedByGoal.get(agentXCo).get(agentYCo);
+              agentPath = currAgentState.getSequence();
+              break;
+          }
+          considerChoices(currAgentState, visitedByAgent, agentToVisit);
+          addToVisitedMap(visitedByAgent, currAgentState);
+        }
+
+        if(!goalToVisit.isEmpty()) {
+          currGoalState = goalToVisit.poll();
+          if(isVisited(visitedByAgent, currGoalState.getCoordinate()) ||
+          sameLocation(currGoalState, currAgentState)) {
+            int goalXCo = currGoalState.getX();
+            int goalYCo = currGoalState.getY();
+            agentPath = visitedByAgent.get(goalXCo).get(goalYCo);
+            goalPath = currGoalState.getSequence();
+            break;
+          }
+          considerChoices(currGoalState, visitedByGoal, goalToVisit);
+          addToVisitedMap(visitedByGoal, currGoalState);
+        }
+      }
+      return combinePaths(agentPath, goalPath);
+   }
+
+   /**
+    * Adds new states to the toVisit list.
+    */
+   private Queue<State> considerChoices(State currentState, Map<Integer, Map<Integer,
+                                String>> visited, Queue<State>toVisit) {
+     String actionSequence = currentState.getSequence();
+     int prevDirection = currentState.getDirection();
+     int numActions = currentState.getNumActions();
+     int x = currentState.getX();
+     int y = currentState.getY();
+     char obj = getObjectInFront(x, y, prevDirection);
+     for(char action: choiceOfMoves) {
+       if((action == MOVE_FORWARD) && (obj == WATER || obj == WALL ||
+                                       obj == TREE  || obj == DOOR)) {
+         //check it doesn't kill agent.
+         // TODO: modify so agent can check against tools it owns.
+       } else {
+         Coordinate stateLoc = new Coordinate(x, y);
+         State nextState = new State(stateLoc, prevDirection, numActions,
+                                        actionSequence);
+         nextState.addMove(action);
+         if(!isVisited(visited, nextState.getCoordinate())) {
+           toVisit.add(nextState);
+         }
+       }
+     }
+     return toVisit;
+   }
+
+   private Map<Integer, Map<Integer, String>> addToVisitedMap(Map<Integer, Map<Integer, String>>visited,
+                                State searchState) {
+          int x = searchState.getX();
+          int y = searchState.getY();
+          String path = searchState.getSequence();
+          if(visited.containsKey(x)) {
+            visited.get(x).put(y, path);
+          } else {
+            Map<Integer, String> yToPath = new HashMap<>();
+            yToPath.put(y, path);
+            visited.put(x, yToPath);
+          }
+          return visited;
+   }
+
+   /**
+    * Converts the search path from the goal state and combines with path from
+    * agent.
+    */
+   private String combinePaths(String agentPath, String goalPath) {
+     char[] goalActions = goalPath.toCharArray();
+     StringBuilder pathBuilder = new StringBuilder(agentPath);
+     // Don't add first action which will overlap with agentPath.
+     for(int i = goalActions.length - 1; i > 0; i--) {
+       char action = goalActions[i];
+       switch(action) {
+       case TURN_LEFT:
+        action = TURN_RIGHT;
+        break;
+       case TURN_RIGHT:
+        action = TURN_LEFT;
+        break;
+       }
+       pathBuilder.append(action);
+     }
+     return pathBuilder.toString();
+   }
+
+   private boolean sameLocation(State a, State b) {
+     return a.getX() == b.getX() && a.getY() == b.getY();
+   }
+
+   /**
+    * Checks if a Coordinate point exists in a map.
+    */
+   private boolean isVisited(Map<Integer, Map<Integer, String>> map, Coordinate point) {
+     int x = point.getX();
+     int y = point.getY();
+     if(map.containsKey(x)) {
+       if(map.get(x).containsKey(y)) {
+         return true;
+       }
+     }
+     return false;
+   }
+
+   /**
+    * Manhattan distance from agent to coordinate.
+    * Ignores obstacles along the way.
+    * Can modify to include agent turn moves.
+    */
+   private int calculateManhattan (Coordinate destination) {
+     int destX = destination.getX();
+     int destY = destination.getY();
+     return Math.abs(currRow - destX) + Math.abs(currCol - destY);
    }
 
    /**

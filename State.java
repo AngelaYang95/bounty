@@ -38,6 +38,14 @@ public class State implements Comparable<State>{
     return location;
   }
 
+  public int getX() {
+    return location.getX();
+  }
+
+  public int getY() {
+    return location.getY();
+  }
+
   public int getDirection() {
     return direction;
   }
