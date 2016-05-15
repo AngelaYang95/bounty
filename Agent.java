@@ -246,7 +246,52 @@ public class Agent {
     *
     */
    private String findPathToCoordinate(Coordinate destination) {
-        return "";
+     // Structures needed for Agent's side of search.
+     Map<Integer, Map<Integer, String>> visitedByAgent = new HashMap<>();
+     Queue<State> agentToVisit = new PriorityQueue<State>();
+     Coordinate agentCurrPoint = new Coordinate(currRow, currCol);
+     State currAgentState = new State(agentCurrPoint, currDir, 0, "");
+     agentToVisit.add(currAgentState);
+     String agentPath = "";
+
+     // Structures needed for Goal side of search.
+     Map<Integer, Map<Integer, String>> visitedByGoal = new HashMap<>();
+     Queue<State> goalToVisit = new PriorityQueue<State>();
+     // TODO: Fix "direction" for goal.
+     State currGoalState = new State(destination, NORTH, 0, "");
+     goalToVisit.add(currGoalState);
+     String goalPath = "";
+
+     while(!agentToVisit.isEmpty() && !goalToVisit.isEmpty()) {
+       if(!agentToVisit.isEmpty()) {
+         currAgentState = agentToVisit.poll();
+         if(isVisited(visitedByGoal, currAgentState.getCoordinate()) ||
+            sameLocation(currAgentState, currGoalState)) {
+             int agentXCo = currAgentState.getX();
+             int agentYCo = currAgentState.getY();
+             goalPath = visitedByGoal.get(agentXCo).get(agentYCo);
+             agentPath = currAgentState.getSequence();
+             break;
+         }
+         considerChoices(currAgentState, visitedByAgent, agentToVisit);
+         addToVisitedMap(visitedByAgent, currAgentState);
+       }
+
+       if(!goalToVisit.isEmpty()) {
+         currGoalState = goalToVisit.poll();
+         if(isVisited(visitedByAgent, currGoalState.getCoordinate()) ||
+         sameLocation(currGoalState, currAgentState)) {
+           int goalXCo = currGoalState.getX();
+           int goalYCo = currGoalState.getY();
+           agentPath = visitedByAgent.get(goalXCo).get(goalYCo);
+           goalPath = currGoalState.getSequence();
+           break;
+         }
+         considerChoices(currGoalState, visitedByGoal, goalToVisit);
+         addToVisitedMap(visitedByGoal, currGoalState);
+       }
+     }
+     return combinePaths(agentPath, goalPath);
    }
 
    /**
