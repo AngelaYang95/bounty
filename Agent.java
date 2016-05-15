@@ -39,9 +39,10 @@ public class Agent {
    final static char WATER = '~';
    final static char SPACE = ' ';
    final static char DOOR = '-';
+   final static char OUT = '.';
 
    private char[][] worldMap = new char[WORLD_MAP_LENGTH][WORLD_MAP_LENGTH];
-   private int initialRow, initialCol;
+   private Coordinate initialLocation;
    char[] choiceOfMoves = {MOVE_FORWARD, TURN_LEFT, TURN_RIGHT};
 
    // Current position and direction of the agent.
@@ -56,19 +57,22 @@ public class Agent {
    private Map<Character, Coordinate> spottedEquipment = new HashMap<>();
 
    private Coordinate goldPosition;
+   private boolean goldSeen;
    private boolean goldIsReachable;
    private boolean hasWonGame;
    private LinkedList<Character> journey = new LinkedList<>();
 
    public Agent() {
-	   initialRow = currRow = AGENT_START_INDEX;
-	   initialCol = currCol = AGENT_START_INDEX;
+     initialLocation = new Coordinate(AGENT_START_INDEX, AGENT_START_INDEX);
+	   currRow = AGENT_START_INDEX;
+	   currCol = AGENT_START_INDEX;
 	   currDir = NORTH;
 	   hasAxe = false;
 	   hasKey = false;
 	   hasGold = false;
 	   numSteppingStones = 0;
      goldIsReachable = false;
+     goldSeen = false;
      hasWonGame = false;
 
 	   // Initialize the World Map to be all unknowns.
@@ -95,7 +99,17 @@ public class Agent {
     // Reverts to random movement if no new terriory reachable.
     char action;
     if(journey.isEmpty()) {
-      String path = conquerTerritory();
+      String path;
+      if(hasGold) {
+        path = findPathToCoordinate(initialLocation);
+      } else if (goldSeen) {
+        path = findPathToCoordinate(goldPosition);
+        System.out.println("GOLD");
+      } else {
+        path = conquerTerritory();
+        System.out.println("GOnquering");
+      }
+
       if(path == "") {
         System.out.println("RANDOM");
         action = getRandomAction();
@@ -105,7 +119,9 @@ public class Agent {
           journey.add(pathAction);
           System.out.print(pathAction);
         }
-        journey.removeLast();
+        if(!goldSeen) {
+          journey.removeLast();
+        }
         action = journey.removeFirst();
       }
     } else {
@@ -151,8 +167,9 @@ public class Agent {
 			   }
 
 			   // Store position of gold.
-			   if(value == GOLD && goldPosition == null) {
+			   if(value == GOLD && !goldSeen) {
 			   		goldPosition = convertToWorldCoordinate(i,j);
+            goldSeen = true;
 			   } else if (value == STEPPING_STONE || value == KEY || value == AXE) {
            Coordinate location = convertToWorldCoordinate(i, j);
            spottedEquipment.put(value, location);
@@ -202,21 +219,21 @@ public class Agent {
     * Currently Uni-cost/bfs for UNKNOWN.
     * Maybe change to iterative deepening.
     * Returns path as list of moves.
-    * TODO: *v* if trapped, start state should be an 180' turn i.e. rr.
-    *       ***
     */
    private String conquerTerritory() {
     // Speed up by changing to 2D array means immediate lookup. But space.
     Map<Integer, Map<Integer, String>> visited = new HashMap<>();
     // Can be priority queue later.
-    Queue<State> toVisit = new LinkedList<State>();
+    Queue<State> toVisit = new PriorityQueue<State>();
     Coordinate currentPoint = new Coordinate(currRow, currCol);
-    State startState = new State(currentPoint, currDir, 0, "");
-    toVisit.add(startState);
+    State currentState = new State(currentPoint, currDir, 0, "");
+    toVisit.add(currentState);
+    currentState = new State(currentPoint, (currDir + 2) % 4, 0, "rr");
+    toVisit.add(currentState);
     String path = "";
     // BFS
     while(!toVisit.isEmpty()) {
-        State currentState = toVisit.poll();
+        currentState = toVisit.poll();
         Coordinate location = currentState.getCoordinate();
         String actionSequence = currentState.getSequence();
         if(getObjectAtPoint(location) == UNKNOWN) {
@@ -243,7 +260,7 @@ public class Agent {
     * Given an x and y point returns a path from the agent's current location to
     * that coordinate.
     * TODO: Bi-directional search with A*. BFS first then update to A*.
-    *
+    * Learn to unlock doors and cut trees etc.
     */
    private String findPathToCoordinate(Coordinate destination) {
      // Structures needed for Agent's side of search.
@@ -251,6 +268,8 @@ public class Agent {
      Queue<State> agentToVisit = new PriorityQueue<State>();
      Coordinate agentCurrPoint = new Coordinate(currRow, currCol);
      State currAgentState = new State(agentCurrPoint, currDir, 0, "");
+     agentToVisit.add(currAgentState);
+     currAgentState = new State(agentCurrPoint, (currDir + 2) % 4, 0, "rr");
      agentToVisit.add(currAgentState);
      String agentPath = "";
 
@@ -291,6 +310,8 @@ public class Agent {
          addToVisitedMap(visitedByGoal, currGoalState);
        }
      }
+    System.out.println("agent path is " + agentPath);
+    System.out.println("goal path is " + goalPath);
      return combinePaths(agentPath, goalPath);
    }
 
@@ -307,7 +328,8 @@ public class Agent {
      char obj = getObjectInFront(x, y, prevDirection);
      for(char action: choiceOfMoves) {
        if((action == MOVE_FORWARD) && (obj == WATER || obj == WALL ||
-                                       obj == TREE  || obj == DOOR)) {
+                                       obj == TREE  || obj == DOOR ||
+                                       obj == OUT)) {
          //check it doesn't kill agent.
          // TODO: modify so agent can check against tools it owns.
        } else {
@@ -363,7 +385,7 @@ public class Agent {
      char[] goalActions = goalPath.toCharArray();
      StringBuilder pathBuilder = new StringBuilder(agentPath);
      // Don't add first action which will overlap with agentPath.
-     for(int i = goalActions.length - 1; i > 0; i--) {
+     for(int i = goalActions.length - 1; i >= 0; i--) {
        char action = goalActions[i];
        switch(action) {
        case TURN_LEFT:
@@ -403,7 +425,7 @@ public class Agent {
      yInWorld = pointInFront.getY();
   		if(xInWorld < 0 || xInWorld >= WORLD_MAP_LENGTH ||
          yInWorld < 0 || yInWorld >= WORLD_MAP_LENGTH) {
-  			return WATER;
+  			return WALL;
   		} else {
   			return worldMap[xInWorld][yInWorld];
   		}
@@ -450,6 +472,12 @@ public class Agent {
 		   } else {
 			   currCol--;
 		   }
+       // YOU GOT GOLD.
+       char obj = getObjectInFront(currRow, currCol, currDir);
+       if(obj == GOLD) {
+         hasGold = true;
+         System.out.println("YOU GOT THE GOLD");
+       }
 	   } else {
        // Catching actions for cutting tree etc.
      }
