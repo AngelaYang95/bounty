@@ -49,12 +49,10 @@ public class Agent {
    private int currRow,currCol,currDir;
 
    // Equipment the agent is currently holding.
-   private boolean hasAxe;
-   private boolean hasKey;
-   private boolean hasGold;
+   Map<Character, Boolean> inventory = new TreeMap<Character, Boolean>();
    private int numSteppingStones;
    // Only tracks location of 1 of each type atm.
-   private Map<Character, Coordinate> spottedEquipment = new HashMap<>();
+   private Map<Character, Coordinate> spottedTools = new HashMap<>();
 
    private Coordinate goldPosition;
    private boolean goldSeen;
@@ -67,9 +65,9 @@ public class Agent {
 	   currRow = AGENT_START_INDEX;
 	   currCol = AGENT_START_INDEX;
 	   currDir = NORTH;
-	   hasAxe = false;
-	   hasKey = false;
-	   hasGold = false;
+     inventory.put(AXE, false);
+	   inventory.put(KEY, false);
+     inventory.put(GOLD, false);
 	   numSteppingStones = 0;
      goldIsReachable = false;
      goldSeen = false;
@@ -94,24 +92,42 @@ public class Agent {
       }
 	  scanView(view);
 
-	  // Decision making for what action to take.
-	  // Currently explores new territory trying not to die.
-    // Reverts to random movement if no new terriory reachable.
+	  /* Decision making for what action to take.
+    Priority:
+    1. Current journey
+    2. If we have gold, find path back to initial position.
+    3. Makes an attempt to get to Gold.
+    4. Tries to get the tools it has seen.
+    5. Tries to explore new spaces.
+    5. Reverts to random movement if nothing else is good.
+    */
     char action;
     if(journey.isEmpty()) {
-      String path;
-      if(hasGold) {
+      String path = "";
+      if(inventory.get(GOLD)) {
         path = findPathToCoordinate(initialLocation);
-      } else if (goldSeen) {
+      }
+
+      // Look for path to tools.
+      if (path == "" && !spottedTools.keySet().isEmpty()) {
+        Iterator<Map.Entry<Character, Coordinate>> it = spottedTools.entrySet().iterator();
+        while(it.hasNext()) {
+          Map.Entry<Character, Coordinate> entry = it.next();
+          path = findPathToCoordinate(entry.getValue());
+        }
+      }
+
+      // Look for path to Gold.
+      if(goldSeen && path == "") {
         path = findPathToCoordinate(goldPosition);
-        System.out.println("GOLD");
-      } else {
-        path = conquerTerritory();
-        System.out.println("GOnquering");
+      }
+
+      // Look for path to UNKNOWN.
+      if(path == "") {
+        path = conquerTerritory(); // TODO: has issues, can go out of world.
       }
 
       if(path == "") {
-        System.out.println("RANDOM");
         action = getRandomAction();
       } else {
         char[] pathArray = path.toCharArray();
@@ -125,7 +141,6 @@ public class Agent {
         action = journey.removeFirst();
       }
     } else {
-      System.out.println("CONTINUING JOURNEY");
       action = journey.removeFirst();
     }
 	  updateNewPosition(action);
@@ -142,9 +157,9 @@ public class Agent {
          char itemInFront = getObjectInFront(currRow, currCol, currDir);
          if(itemInFront != SPACE) { // BE CAREFUL DON'T DIE.
             action = TURN_LEFT;
-            if(itemInFront == TREE && hasAxe) {
+            if(itemInFront == TREE && inventory.get(AXE)) {
                 action = CUT_DOWN;
-            } else if(itemInFront == DOOR && hasKey) {
+            } else if(itemInFront == DOOR && inventory.get(KEY)) {
                 action = OPEN_DOOR;
             }
          }
@@ -155,6 +170,7 @@ public class Agent {
    /**
     * Scans the given 5x5 view and updates AI's map with information.
     * TODO: Change so it doesn't constantly rescan already know information.
+    * Lowercase all roman letters.
     */
    public void scanView( char view[][]) {
 	   for(int i = 0; i < WINDOW_SIZE; i++) {
@@ -172,7 +188,7 @@ public class Agent {
             goldSeen = true;
 			   } else if (value == STEPPING_STONE || value == KEY || value == AXE) {
            Coordinate location = convertToWorldCoordinate(i, j);
-           spottedEquipment.put(value, location);
+           spottedTools.put(value, location);
          }
 		   }
 	   }
@@ -228,7 +244,7 @@ public class Agent {
     Coordinate currentPoint = new Coordinate(currRow, currCol);
     State currentState = new State(currentPoint, currDir, 0, "");
     toVisit.add(currentState);
-    currentState = new State(currentPoint, (currDir + 2) % 4, 0, "rr");
+    currentState = new State(currentPoint, (currDir + 2) % 4, 2, "rr");
     toVisit.add(currentState);
     String path = "";
     // BFS
@@ -272,14 +288,15 @@ public class Agent {
      currAgentState = new State(agentCurrPoint, (currDir + 2) % 4, 0, "rr");
      agentToVisit.add(currAgentState);
      String agentPath = "";
+     int agentFinalDir = 5;
 
      // Structures needed for Goal side of search.
      Map<Integer, Map<Integer, String>> visitedByGoal = new HashMap<>();
      Queue<State> goalToVisit = new PriorityQueue<State>();
-     // TODO: Fix "direction" for goal.
      State currGoalState = new State(destination, NORTH, 0, "");
      goalToVisit.add(currGoalState);
      String goalPath = "";
+     int goalFinalDir = 5;
 
      while(!agentToVisit.isEmpty() && !goalToVisit.isEmpty()) {
        if(!agentToVisit.isEmpty()) {
@@ -290,6 +307,7 @@ public class Agent {
              int agentYCo = currAgentState.getY();
              goalPath = visitedByGoal.get(agentXCo).get(agentYCo);
              agentPath = currAgentState.getSequence();
+             agentFinalDir = currAgentState.getDirection();
              break;
          }
          considerChoices(currAgentState, visitedByAgent, agentToVisit);
@@ -304,15 +322,16 @@ public class Agent {
            int goalYCo = currGoalState.getY();
            agentPath = visitedByAgent.get(goalXCo).get(goalYCo);
            goalPath = currGoalState.getSequence();
+           goalFinalDir = currGoalState.getDirection();
            break;
          }
          considerChoices(currGoalState, visitedByGoal, goalToVisit);
          addToVisitedMap(visitedByGoal, currGoalState);
        }
      }
-    System.out.println("agent path is " + agentPath);
-    System.out.println("goal path is " + goalPath);
-     return combinePaths(agentPath, goalPath);
+    System.out.println("Agent path is " + agentPath);
+    System.out.println("Goal path is " + goalPath);
+     return combinePaths(agentPath, agentFinalDir, goalPath, goalFinalDir);
    }
 
    /**
@@ -327,19 +346,24 @@ public class Agent {
      int y = currentState.getY();
      char obj = getObjectInFront(x, y, prevDirection);
      for(char action: choiceOfMoves) {
-       if((action == MOVE_FORWARD) && (obj == WATER || obj == WALL ||
-                                       obj == TREE  || obj == DOOR ||
-                                       obj == OUT)) {
-         //check it doesn't kill agent.
-         // TODO: modify so agent can check against tools it owns.
-       } else {
-         Coordinate stateLoc = new Coordinate(x, y);
-         State nextState = new State(stateLoc, prevDirection, numActions,
-                                        actionSequence);
-         nextState.addMove(action);
-         if(!isVisited(visited, nextState.getCoordinate())) {
-           toVisit.add(nextState);
-         }
+       if(action == MOVE_FORWARD && (obj == WATER || obj == WALL ||
+                                      obj == OUT  ||
+                                     (obj == TREE && !inventory.get(AXE)) ||
+                                     (obj == DOOR && !inventory.get(KEY)))) {
+         continue;
+       }
+       Coordinate stateLoc = new Coordinate(x, y);
+       State nextState = new State(stateLoc, prevDirection, numActions,
+                                      actionSequence);
+       if (obj == TREE) {
+          nextState.addMove(CUT_DOWN);
+       } else if (obj == DOOR) {
+         nextState.addMove(OPEN_DOOR);
+         // TODO: Stepping stone, crossing water.
+       }
+       nextState.addMove(action);
+       if(!isVisited(visited, nextState.getCoordinate())) {
+         toVisit.add(nextState);
        }
      }
      return toVisit;
@@ -380,11 +404,50 @@ public class Agent {
    /**
     * Converts the search path from the goal state and combines with path from
     * agent.
+    * TODO: make sure they meet at move facing same direction.
     */
-   private String combinePaths(String agentPath, String goalPath) {
+   private String combinePaths(String agentPath, int agentFinalDir,
+                          String goalPath, int goalFinalDir) {
+     char[] agentActions = agentPath.toCharArray();
      char[] goalActions = goalPath.toCharArray();
+     if(agentActions.length == 0 && goalActions.length == 0) {
+       return agentPath;
+     }
+
+     if(agentFinalDir == 5) {
+       agentFinalDir = currDir;
+       for(char action :agentActions) {
+         if(action == TURN_LEFT) {
+           agentFinalDir--;
+           agentFinalDir = (agentFinalDir + 8) % 4;
+         } else if (action == TURN_RIGHT) {
+           agentFinalDir = agentFinalDir + 1 + 4;
+           agentFinalDir %= 4;
+         }
+       }
+     } else {
+       goalFinalDir = NORTH;
+       for(char action: goalActions) {
+           if(action == TURN_LEFT) {
+             goalFinalDir--;
+             goalFinalDir = (goalFinalDir + 8) % 4;
+           } else if (action == TURN_RIGHT) {
+             goalFinalDir = goalFinalDir + 1 + 4;
+             goalFinalDir %= 4;
+           }
+       }
+     }
      StringBuilder pathBuilder = new StringBuilder(agentPath);
-     // Don't add first action which will overlap with agentPath.
+     if((agentFinalDir + 2) % 4 != goalFinalDir) {
+       if((agentFinalDir + 1) % 4 == goalFinalDir) {
+         pathBuilder.append(TURN_LEFT);
+       } else if((agentFinalDir - 1 + 4) % 4 == goalFinalDir) {
+         pathBuilder.append(TURN_RIGHT);
+       } else {
+         System.out.println("WARNING: goal and path search error");
+       }
+     }
+
      for(int i = goalActions.length - 1; i >= 0; i--) {
        char action = goalActions[i];
        switch(action) {
@@ -400,6 +463,9 @@ public class Agent {
      return pathBuilder.toString();
    }
 
+   /**
+    * TODO: Move to be function in State.java.
+    */
    private boolean sameLocation(State a, State b) {
      return a.getX() == b.getX() && a.getY() == b.getY();
    }
@@ -420,36 +486,26 @@ public class Agent {
     * position.
     */
    private char getObjectInFront(int xInWorld, int yInWorld, int direction) {
-     Coordinate pointInFront = getCoordinateNextdoor(xInWorld, yInWorld, direction);
-     xInWorld = pointInFront.getX();
-     yInWorld = pointInFront.getY();
+       switch (direction) {
+         case Agent.NORTH:
+           xInWorld--;
+           break;
+         case Agent.EAST:
+           yInWorld++;
+           break;
+         case Agent.SOUTH:
+           xInWorld++;
+           break;
+         case Agent.WEST:
+           yInWorld--;
+           break;
+       }
   		if(xInWorld < 0 || xInWorld >= WORLD_MAP_LENGTH ||
          yInWorld < 0 || yInWorld >= WORLD_MAP_LENGTH) {
   			return WALL;
   		} else {
   			return worldMap[xInWorld][yInWorld];
   		}
-   }
-
-   /**
-    * Gives coordinate next to point in a given direction.
-    */
-   private Coordinate getCoordinateNextdoor(int xInWorld, int yInWorld, int direction) {
-     switch (direction) {
-       case Agent.NORTH:
-         xInWorld--;
-         break;
-       case Agent.EAST:
-         yInWorld++;
-         break;
-       case Agent.SOUTH:
-         xInWorld++;
-         break;
-       case Agent.WEST:
-         yInWorld--;
-         break;
-     }
-     return new Coordinate(xInWorld, yInWorld);
    }
 
    /**
@@ -472,14 +528,18 @@ public class Agent {
 		   } else {
 			   currCol--;
 		   }
-       // YOU GOT GOLD.
-       char obj = getObjectInFront(currRow, currCol, currDir);
-       if(obj == GOLD) {
-         hasGold = true;
-         System.out.println("YOU GOT THE GOLD");
-       }
 	   } else {
        // Catching actions for cutting tree etc.
+     }
+     // YOU GOT AN ITEM.
+     char obj = getObjectAtPoint(new Coordinate(currRow, currCol));
+     switch(obj) {
+      case GOLD: case AXE: case KEY:
+      spottedTools.remove(obj);
+      inventory.put(obj,true);
+      break;
+      case STEPPING_STONE:
+      numSteppingStones++;
      }
    }
 
@@ -508,7 +568,7 @@ public class Agent {
          out = socket.getOutputStream();
       }
       catch( IOException e ) {
-         System.out.println("Could not bind to port: "+port);
+         System.out.println("Could not bind to port: " + port);
          System.exit(-1);
       }
 
@@ -529,7 +589,7 @@ public class Agent {
 
             agent.print_view(view); // COMMENT THIS OUT BEFORE SUBMISSION
             agent.scanView(view);
-            agent.show_world(); // COMMENT THIS OUT BEFORE SUBMISSION
+            //agent.show_world(); // COMMENT THIS OUT BEFORE SUBMISSION
             action = agent.get_action(view);
             out.write( action );
          }
