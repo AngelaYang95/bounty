@@ -143,6 +143,7 @@ public class Agent {
 
       if(path == "") {
         action = getRandomAction();
+        System.out.println("RANDOM");
       } else {
         action = journey.removeFirst();
       }
@@ -298,7 +299,9 @@ public class Agent {
      Coordinate agentCurrPoint = new Coordinate(currRow, currCol);
      State currAgentState = new State(agentCurrPoint, currDir, 0, "");
      agentToVisit.add(currAgentState);
-     currAgentState = new State(agentCurrPoint, (currDir + 2) % 4, 0, "rr");
+     int a = (currDir + 2) % 4;
+     System.out.println(currDir + "inverted is " + a);
+     currAgentState = new State(agentCurrPoint, (currDir + 2) % 4, 2, "rr");
      agentToVisit.add(currAgentState);
      String agentPath = "";
      int agentFinalDir = 5;
@@ -314,6 +317,7 @@ public class Agent {
      while(!agentToVisit.isEmpty() && !goalToVisit.isEmpty()) {
        if(!agentToVisit.isEmpty()) {
          currAgentState = agentToVisit.poll();
+         System.out.println("Agent path choice is " + currAgentState.getSequence());
          if(isVisited(visitedByGoal, currAgentState.getCoordinate()) ||
             sameLocation(currAgentState, currGoalState)) {
              int agentXCo = currAgentState.getX();
@@ -336,6 +340,7 @@ public class Agent {
            agentPath = visitedByAgent.get(goalXCo).get(goalYCo);
            goalPath = currGoalState.getSequence();
            goalFinalDir = currGoalState.getDirection();
+           System.out.println("Found by goal");
            break;
          }
          considerChoices(currGoalState, visitedByGoal, goalToVisit);
@@ -383,6 +388,20 @@ public class Agent {
    }
 
    /**
+    * Checks if a Coordinate point exists in a map.
+    */
+   private boolean isVisited(Map<Integer, Map<Integer, String>> map, Coordinate point) {
+     int x = point.getX();
+     int y = point.getY();
+     if(map.containsKey(x)) {
+       if(map.get(x).containsKey(y)) {
+         return true;
+       }
+     }
+     return false;
+   }
+
+   /**
     * Adds new State to map.
     */
    private Map<Integer, Map<Integer, String>> addToVisitedMap(Map<Integer, Map<Integer, String>>visited,
@@ -391,7 +410,9 @@ public class Agent {
           int y = searchState.getY();
           String path = searchState.getSequence();
           if(visited.containsKey(x)) {
-            visited.get(x).put(y, path);
+            if(!visited.get(x).containsKey(y)) {
+              visited.get(x).put(y, path);
+            }
           } else {
             Map<Integer, String> yToPath = new HashMap<>();
             yToPath.put(y, path);
@@ -399,20 +420,6 @@ public class Agent {
           }
           return visited;
    }
-
-    /**
-     * Checks if a Coordinate point exists in a map.
-     */
-    private boolean isVisited(Map<Integer, Map<Integer, String>> map, Coordinate point) {
-      int x = point.getX();
-      int y = point.getY();
-      if(map.containsKey(x)) {
-        if(map.get(x).containsKey(y)) {
-          return true;
-        }
-      }
-      return false;
-    }
 
    /**
     * Converts the search path from the goal state and combines with path from
