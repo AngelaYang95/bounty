@@ -101,11 +101,12 @@ public class Agent {
     5. Tries to explore new spaces.
     5. Reverts to random movement if nothing else is good.
     */
-    char action;
+    char action = TURN_LEFT;
     if(journey.isEmpty()) {
       String path = "";
       if(inventory.get(GOLD)) {
         path = findPathToCoordinate(initialLocation);
+        createJourney(path);
       }
 
       // Look for path to tools.
@@ -114,30 +115,35 @@ public class Agent {
         while(it.hasNext()) {
           Map.Entry<Character, Coordinate> entry = it.next();
           path = findPathToCoordinate(entry.getValue());
+          if(path != "") {
+            System.out.println("Trying to get to " + entry.getKey());
+            createJourney(path);
+            break;
+          }
         }
       }
 
       // Look for path to Gold.
       if(goldSeen && path == "") {
         path = findPathToCoordinate(goldPosition);
+        createJourney(path);
+        System.out.println("Gold search " + path);
       }
 
       // Look for path to UNKNOWN.
       if(path == "") {
         path = conquerTerritory(); // TODO: has issues, can go out of world.
+        createJourney(path);
+        if(path == "") {
+          System.out.println("Couldn't find unknown");
+        } else {
+          System.out.println("territory search " + path);
+        }
       }
 
       if(path == "") {
         action = getRandomAction();
       } else {
-        char[] pathArray = path.toCharArray();
-        for(char pathAction: pathArray) {
-          journey.add(pathAction);
-          System.out.print(pathAction);
-        }
-        if(!goldSeen) {
-          journey.removeLast();
-        }
         action = journey.removeFirst();
       }
     } else {
@@ -145,6 +151,13 @@ public class Agent {
     }
 	  updateNewPosition(action);
 	  return action;
+   }
+
+   private void createJourney(String path) {
+     char[] pathArray = path.toCharArray();
+     for(char pathAction: pathArray) {
+       journey.add(pathAction);
+     }
    }
 
    /**
@@ -250,9 +263,9 @@ public class Agent {
     // BFS
     while(!toVisit.isEmpty()) {
         currentState = toVisit.poll();
-        Coordinate location = currentState.getCoordinate();
         String actionSequence = currentState.getSequence();
-        if(getObjectAtPoint(location) == UNKNOWN) {
+        if(getObjectInFront(currentState.getX(), currentState.getY(),
+                            currentState.getDirection()) == UNKNOWN) {
             path = actionSequence;
             break;
         }
@@ -346,8 +359,8 @@ public class Agent {
      int y = currentState.getY();
      char obj = getObjectInFront(x, y, prevDirection);
      for(char action: choiceOfMoves) {
-       if(action == MOVE_FORWARD && (obj == WATER || obj == WALL ||
-                                      obj == OUT  ||
+       if(action == MOVE_FORWARD && (obj == UNKNOWN || obj == WATER ||
+                                     obj == WALL     || obj == OUT   ||
                                      (obj == TREE && !inventory.get(AXE)) ||
                                      (obj == DOOR && !inventory.get(KEY)))) {
          continue;
@@ -514,10 +527,11 @@ public class Agent {
     * AI attempting to walk through wall will break it's worldMap.
     */
    private void updateNewPosition(char action) {
+     System.out.println("NEXT MOVE IS " + action);
 	   if(action == TURN_LEFT) {
        currDir = ((currDir - 1) + 8) % 4;  // Java's % gives only remainder.
      } else if (action == TURN_RIGHT) {
-		   currDir = ((currDir + 1) + 4) % 4;
+		   currDir = (currDir + 1) % 4;
 	   } else if (action == MOVE_FORWARD) {
 		   if(currDir == NORTH) {
 			   currRow--;
@@ -589,7 +603,7 @@ public class Agent {
 
             agent.print_view(view); // COMMENT THIS OUT BEFORE SUBMISSION
             agent.scanView(view);
-            //agent.show_world(); // COMMENT THIS OUT BEFORE SUBMISSION
+            agent.show_world(); // COMMENT THIS OUT BEFORE SUBMISSION
             action = agent.get_action(view);
             out.write( action );
          }
