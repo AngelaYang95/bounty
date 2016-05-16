@@ -122,7 +122,7 @@ public class Agent {
           }
         }
       }
-
+      // fflffff-r-fflffurfflffr
       // Look for path to Gold.
       if(goldSeen && path == "") {
         path = findPathToCoordinate(goldPosition);
@@ -458,6 +458,7 @@ public class Agent {
        }
      }
      StringBuilder pathBuilder = new StringBuilder(agentPath);
+     // Create a joiner
      if((agentFinalDir + 2) % 4 != goalFinalDir) {
        if((agentFinalDir + 1) % 4 == goalFinalDir) {
          pathBuilder.append(TURN_LEFT);
@@ -467,19 +468,38 @@ public class Agent {
          System.out.println("WARNING: goal and path search error");
        }
      }
-
-     for(int i = goalActions.length - 1; i >= 0; i--) {
+     // TODO: Change to if and else.
+     StringBuilder goalReversed = new StringBuilder();
+     for(int i = 0; i < goalActions.length; i++) {
        char action = goalActions[i];
-       switch(action) {
-       case TURN_LEFT:
-        action = TURN_RIGHT;
-        break;
-       case TURN_RIGHT:
-        action = TURN_LEFT;
-        break;
+       if(action == OPEN_DOOR || action == CUT_DOWN) {
+         int numforwards = 0;
+         StringBuilder toolUse = new StringBuilder();
+         while(numforwards != 2 && i < goalActions.length) {
+           action = goalActions[i];
+           if(action == TURN_LEFT) {
+             action = TURN_RIGHT;
+           } else if(action == TURN_RIGHT) {
+             action = TURN_LEFT;
+           } else if(action == MOVE_FORWARD) {
+             numforwards++;
+           }
+           toolUse.append(action);
+           i++;
+         }
+         i--;
+         goalReversed.insert(0, toolUse.toString());
+       } else {
+         if(action == TURN_LEFT) {
+           action = TURN_RIGHT;
+         } else if (action == TURN_RIGHT) {
+           action = TURN_LEFT;
+         }
+         goalReversed.insert(0, action);
        }
-       pathBuilder.append(action);
      }
+     pathBuilder.append(goalReversed);
+     // Reverse string.
      return pathBuilder.toString();
    }
 
