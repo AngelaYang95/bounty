@@ -291,6 +291,7 @@ public class Agent {
     * that coordinate.
     * TODO: Bi-directional search with A*. BFS first then update to A*.
     * Learn to unlock doors and cut trees etc.
+    * TODO: Changing states to store coordinates instead of moves.
     */
    private String findPathToCoordinate(Coordinate destination) {
      // Structures needed for Agent's side of search.
@@ -300,7 +301,6 @@ public class Agent {
      State currAgentState = new State(agentCurrPoint, currDir, 0, "");
      agentToVisit.add(currAgentState);
      int a = (currDir + 2) % 4;
-     System.out.println(currDir + "inverted is " + a);
      currAgentState = new State(agentCurrPoint, (currDir + 2) % 4, 2, "rr");
      agentToVisit.add(currAgentState);
      String agentPath = "";
@@ -424,7 +424,6 @@ public class Agent {
    /**
     * Converts the search path from the goal state and combines with path from
     * agent.
-    * TODO: make sure they meet at move facing same direction.
     */
    private String combinePaths(String agentPath, int agentFinalDir,
                           String goalPath, int goalFinalDir) {
@@ -468,7 +467,6 @@ public class Agent {
          System.out.println("WARNING: goal and path search error");
        }
      }
-     // TODO: Change to if and else.
      StringBuilder goalReversed = new StringBuilder();
      for(int i = 0; i < goalActions.length; i++) {
        char action = goalActions[i];
