@@ -1,18 +1,21 @@
+import java.util.*;
 /**
  * Structure to hold data in search finding algorithms.
  */
 public class State implements Comparable<State>{
   private Coordinate location;
   private int direction;
-  //private List<Coordinate> path = new LinkedList<>();
   private String actionSequence;
   private int numActions;
+  private int numStones;
+  private List<Coordinate> stoneLocations = new LinkedList<>();
 
-  public State(Coordinate start, int startDir, int numActions, String actions) {
+  public State(Coordinate start, int startDir, int numActions, String actions, int numStones) {
     this.direction = startDir;
     location = start;
     this.numActions = numActions;
     actionSequence = actions;
+    this.numStones = numStones;
   }
 
   /**
@@ -32,6 +35,45 @@ public class State implements Comparable<State>{
         location.takeStep(direction);
         break;
     }
+  }
+
+  public void showStones() {
+    for(Coordinate point: stoneLocations) {
+      System.out.println(point.getX() + "," + point.getY());
+
+    }
+  }
+
+  public int getNumStones() {
+    return numStones;
+  }
+
+  public void addStone() {
+    numStones++;
+  }
+
+  public void addStoneLocations(List<Coordinate> points) {
+    stoneLocations.addAll(points);
+  }
+
+  public List<Coordinate> getStoneLocations() {
+    return stoneLocations;
+  }
+
+  public void placeStoneInFront() {
+    numStones--;
+    Coordinate stoneLocation = new Coordinate(location.getX(), location.getY());
+    stoneLocation.takeStep(direction);
+    stoneLocations.add(stoneLocation);
+  }
+
+  public boolean hasStoneInFront() {
+    Coordinate stoneLocation = new Coordinate(location.getX(), location.getY());
+    stoneLocation.takeStep(direction);
+    if(stoneLocations.isEmpty()) {
+      System.out.println(actionSequence + "stone points is empty");
+    }
+    return stoneLocations.contains(stoneLocation);
   }
 
   public Coordinate getCoordinate() {
