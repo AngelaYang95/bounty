@@ -1,18 +1,26 @@
+import java.util.*;
 /**
  * Structure to hold data in search finding algorithms.
  */
 public class State implements Comparable<State>{
   private Coordinate location;
   private int direction;
-  //private List<Coordinate> path = new LinkedList<>();
   private String actionSequence;
   private int numActions;
+  private int numStones;
+  private List<Coordinate> stoneLocations = new LinkedList<>();
+  private boolean hasKey;
+  private boolean hasAxe;
+  private boolean hCost;
 
-  public State(Coordinate start, int startDir, int numActions, String actions) {
+  public State(Coordinate start, int startDir, int numActions, String actions, boolean hasAxe, boolean hasKey, int numStones) {
     this.direction = startDir;
     location = start;
     this.numActions = numActions;
     actionSequence = actions;
+    this.numStones = numStones;
+    this.hasAxe = hasAxe;
+    this.hasKey = hasKey;
   }
 
   /**
@@ -32,6 +40,51 @@ public class State implements Comparable<State>{
         location.takeStep(direction);
         break;
     }
+  }
+
+  public int getNumStones() {
+    return numStones;
+  }
+
+  public void addStone() {
+    numStones++;
+  }
+
+  public void addStoneLocations(List<Coordinate> points) {
+    stoneLocations.addAll(points);
+  }
+
+  public List<Coordinate> getStoneLocations() {
+    return stoneLocations;
+  }
+
+  public void placeStoneInFront() {
+    numStones--;
+    Coordinate stoneLocation = new Coordinate(location.getX(), location.getY());
+    stoneLocation.takeStep(direction);
+    stoneLocations.add(stoneLocation);
+  }
+
+  public boolean hasStoneInFront() {
+    Coordinate stoneLocation = new Coordinate(location.getX(), location.getY());
+    stoneLocation.takeStep(direction);
+    return stoneLocations.contains(stoneLocation);
+  }
+
+  public void addAxe() {
+    hasAxe = true;
+  }
+
+  public boolean hasAxe(){
+    return hasAxe;
+  }
+
+  public void addKey(){
+    hasKey = true;
+  }
+
+  public boolean hasKey() {
+    return hasKey;
   }
 
   public Coordinate getCoordinate() {

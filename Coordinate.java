@@ -1,6 +1,6 @@
 import java.util.Map;
 /**
- * Structure to hold a position in map.
+ * Structure to hold a potential position in map.
  */
 public class Coordinate {
 
