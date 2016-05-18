@@ -148,6 +148,7 @@ public class Agent {
           System.out.println("territory search " + path);
         }
       }
+
       // Choose random action if no paths are found above.
       if(path == "") {
         action = getRandomAction();
@@ -491,6 +492,7 @@ public class Agent {
       case STEPPING_STONE:
       spottedTools.remove(obj);
       numStones++;
+      break;
       case WATER:
       numStones--;
       break;
