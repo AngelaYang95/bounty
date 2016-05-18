@@ -11,13 +11,14 @@ public class State implements Comparable<State>{
   private List<Coordinate> stoneLocations = new LinkedList<>();
   private boolean hasKey;
   private boolean hasAxe;
+  private boolean hCost;
 
-  public State(Coordinate start, int startDir, int numActions, String actions, boolean hasAxe, boolean hasKey) {
+  public State(Coordinate start, int startDir, int numActions, String actions, boolean hasAxe, boolean hasKey, int numStones) {
     this.direction = startDir;
     location = start;
     this.numActions = numActions;
     actionSequence = actions;
-    this.numStones = 0;
+    this.numStones = numStones;
     this.hasAxe = hasAxe;
     this.hasKey = hasKey;
   }
@@ -38,13 +39,6 @@ public class State implements Comparable<State>{
       case Agent.MOVE_FORWARD:
         location.takeStep(direction);
         break;
-    }
-  }
-
-  public void showStones() {
-    for(Coordinate point: stoneLocations) {
-      System.out.println(point.getX() + "," + point.getY());
-
     }
   }
 

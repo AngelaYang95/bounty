@@ -60,6 +60,8 @@ public class Agent {
    private boolean hasWonGame;
    private LinkedList<Character> journey = new LinkedList<>();
 
+   private int numShown;
+
    public Agent() {
      initialLocation = new Coordinate(AGENT_START_INDEX, AGENT_START_INDEX);
 	   currRow = AGENT_START_INDEX;
@@ -73,7 +75,8 @@ public class Agent {
      goldSeen = false;
      hasWonGame = false;
 
-	   // Initialize the World Map to be all unknowns.
+     numShown = 0;
+	   // Initialize the World Map to be all UNKNOWNs.
 	   for(char[] row: worldMap) {
 		   Arrays.fill(row, UNKNOWN);
 	   }
@@ -83,15 +86,19 @@ public class Agent {
     * Given a view of it's surroundings, returns an action.
     */
    public char get_action( char view[][] ) {
-      System.out.print("Next Step");
-      try {
-      	 System.in.read();
-      }
-      catch (IOException e) {
-         System.out.println ("IO error:" + e );
-      }
-	  scanView(view);
+     if(numShown == 25) {
+       numShown = 0;
+       System.out.print("Next 25 steps");
+       try {
+       	 System.in.read();
+       }
+       catch (IOException e) {
+          System.out.println ("IO error:" + e );
+       }
+     }
 
+	  scanView(view);
+    numShown++;
 	  /* Decision making for what action to take.
     Priority:
     1. Current journey
@@ -105,8 +112,15 @@ public class Agent {
     if(journey.isEmpty()) {
       String path = "";
       if(inventory.get(GOLD)) {
-        path = findPathToCoordinate(initialLocation, 0);
+        path = findPathToCoordinate(initialLocation);
         createJourney(path);
+      }
+
+      // Look for path to GOLD.
+      if(goldSeen && path == "") {
+        path = findPathToCoordinate(goldPosition);
+        createJourney(path);
+        System.out.println("Gold search " + path);
       }
 
       // Look for path to tools.
@@ -114,7 +128,7 @@ public class Agent {
         Iterator<Map.Entry<Character, Coordinate>> it = spottedTools.entrySet().iterator();
         while(it.hasNext()) {
           Map.Entry<Character, Coordinate> entry = it.next();
-          path = findPathToCoordinate(entry.getValue(), numStones);
+          path = findPathToCoordinate(entry.getValue());
           System.out.println("Trying to get to " + entry.getKey());
           if(path != "") {
             createJourney(path);
@@ -123,17 +137,10 @@ public class Agent {
         }
       }
 
-      // Look for path to Gold.
-      if(goldSeen && path == "") {
-        path = findPathToCoordinate(goldPosition, numStones);
-        createJourney(path);
-        System.out.println("Gold search " + path);
-      }
-
       // Look for path to UNKNOWN.
       if(path == "") {
         System.out.println("Conquering Territory");
-        path = conquerTerritory(); // TODO: has issues, can go out of world.
+        path = conquerTerritory();
         createJourney(path);
         if(path == "") {
           System.out.println("Couldn't find unknown");
@@ -142,14 +149,7 @@ public class Agent {
         }
       }
 
-      /* Find place to set stone and improve situation.
-       * Finding Water way that gets us somewhere.
-       */
-      if(path == "") {
-
-      }
-
-
+      // Choose random action if no paths are found above.
       if(path == "") {
         action = getRandomAction();
         System.out.println("RANDOM");
@@ -272,16 +272,15 @@ public class Agent {
     // Can be priority queue later.
     Queue<State> toVisit = new PriorityQueue<State>();
     Coordinate currentPoint = new Coordinate(currRow, currCol);
-    State currentState = new State(currentPoint, currDir, 0, "", axe, key); // Don't use stones in territory spread.
+    State currentState = new State(currentPoint, currDir, 0, "", axe, key, 0); // Don't use stones in territory spread.
     toVisit.add(currentState);
-    currentState = new State(currentPoint, (currDir + 2) % 4, 2, "rr", axe, key);
+    currentState = new State(currentPoint, (currDir + 2) % 4, 2, "rr", axe, key, 0);
     toVisit.add(currentState);
     String path = "";
     // BFS
     while(!toVisit.isEmpty()) {
         currentState = toVisit.poll();
         String actionSequence = currentState.getSequence();
-
         if(getObjectInFront(currentState.getX(), currentState.getY(),
                     currentState.getDirection(), 2) == UNKNOWN ||
            getObjectInFront(currentState.getX(), currentState.getY(),
@@ -290,7 +289,6 @@ public class Agent {
             break;
         }
         toVisit = considerChoices(currentState, visited, toVisit);
-        // Added afterwards to allow states facing left and right to be added.
         visited = addToVisitedMap(visited, currentState);
     }
 	  return path;
@@ -312,7 +310,7 @@ public class Agent {
     * Putting down stone should be last priority.
     * Stones should be placed to improve situation after.
     */
-   private String findPathToCoordinate(Coordinate destination, int stoneAvailable) {
+   private String findPathToCoordinate(Coordinate destination) {
      boolean hasAxe = inventory.get(AXE);
      boolean hasKey = inventory.get(KEY);
 
@@ -323,28 +321,25 @@ public class Agent {
      Map<Integer, Map<Integer, String>> visitedByAgent = new HashMap<>();
      Queue<State> agentToVisit = new PriorityQueue<State>();
      Coordinate agentCurrPoint = new Coordinate(currRow, currCol);
-     State currAgentState = new State(agentCurrPoint, currDir, 0, "", hasAxe, hasKey);
+     State currAgentState = new State(agentCurrPoint, currDir, 0, "", hasAxe, hasKey, numStones);
      agentToVisit.add(currAgentState);
-     int a = (currDir + 2) % 4;
-     currAgentState = new State(agentCurrPoint, (currDir + 2) % 4, 2, "rr", hasAxe, hasKey);
+     currAgentState = new State(agentCurrPoint, (currDir + 2) % 4, 2, "rr", hasAxe, hasKey, numStones);
      agentToVisit.add(currAgentState);
      String agentPath = "";
 
      while(!agentToVisit.isEmpty()) {
-       if(!agentToVisit.isEmpty()) {
-         currAgentState = agentToVisit.poll();
-         if(currAgentState.getCoordinate().equals(destination)) {
-             int agentXCo = currAgentState.getX();
-             int agentYCo = currAgentState.getY();
-             agentPath = currAgentState.getSequence();
-             break;
-         }
-         considerChoices(currAgentState, visitedByAgent, agentToVisit);
-         addToVisitedMap(visitedByAgent, currAgentState);
+       currAgentState = agentToVisit.poll();
+       if(currAgentState.getCoordinate().equals(destination)) {
+           int agentXCo = currAgentState.getX();
+           int agentYCo = currAgentState.getY();
+           agentPath = currAgentState.getSequence();
+           break;
        }
-     }
-    System.out.println("Agent path is " + agentPath);
-     return agentPath;
+       considerChoices(currAgentState, visitedByAgent, agentToVisit);
+       addToVisitedMap(visitedByAgent, currAgentState);
+      }
+      System.out.println("Agent path is " + agentPath);
+      return agentPath;
    }
 
    /**
@@ -357,13 +352,14 @@ public class Agent {
      int numActions = currentState.getNumActions();
      boolean hasAxe = currentState.hasAxe();
      boolean hasKey = currentState.hasKey();
-     List<Coordinate> stoneLocations = currentState.getStoneLocations();
+     int numSteppingStones = currentState.getNumStones();
      int x = currentState.getX();
      int y = currentState.getY();
      char obj = getObjectInFront(x, y, prevDirection, 1);
      for(char action: choiceOfMoves) {
        if(action == MOVE_FORWARD && (obj == UNKNOWN || obj == WALL ||
-                                     obj == OUT     || obj == WATER ||
+                                     obj == OUT     ||
+                                     (obj == WATER && numSteppingStones == 0 && !currentState.hasStoneInFront()) ||
                                      (obj == TREE && !currentState.hasAxe())||
                                      (obj == DOOR && !currentState.hasKey()))) {
          continue;
@@ -371,9 +367,8 @@ public class Agent {
 
        Coordinate stateLoc = new Coordinate(x, y);
        State nextState = new State(stateLoc, prevDirection, numActions,
-                                      actionSequence, hasAxe, hasKey);
-       nextState.addStoneLocations(stoneLocations);
-
+                             actionSequence, hasAxe, hasKey, numSteppingStones);
+       nextState.addStoneLocations(currentState.getStoneLocations());
        if(action == MOVE_FORWARD) {
          if (obj == TREE) {
             nextState.addMove(CUT_DOWN);
@@ -385,6 +380,8 @@ public class Agent {
            nextState.addAxe();
          } else if (obj == STEPPING_STONE) {
            nextState.addStone();
+         } else if (obj == WATER && !currentState.hasStoneInFront()) {
+           nextState.placeStoneInFront();
          }
        }
        nextState.addMove(action);
