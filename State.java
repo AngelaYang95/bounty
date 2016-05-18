@@ -9,13 +9,17 @@ public class State implements Comparable<State>{
   private int numActions;
   private int numStones;
   private List<Coordinate> stoneLocations = new LinkedList<>();
+  private boolean hasKey;
+  private boolean hasAxe;
 
-  public State(Coordinate start, int startDir, int numActions, String actions, int numStones) {
+  public State(Coordinate start, int startDir, int numActions, String actions, boolean hasAxe, boolean hasKey) {
     this.direction = startDir;
     location = start;
     this.numActions = numActions;
     actionSequence = actions;
-    this.numStones = numStones;
+    this.numStones = 0;
+    this.hasAxe = hasAxe;
+    this.hasKey = hasKey;
   }
 
   /**
@@ -70,10 +74,23 @@ public class State implements Comparable<State>{
   public boolean hasStoneInFront() {
     Coordinate stoneLocation = new Coordinate(location.getX(), location.getY());
     stoneLocation.takeStep(direction);
-    if(stoneLocations.isEmpty()) {
-      System.out.println(actionSequence + "stone points is empty");
-    }
     return stoneLocations.contains(stoneLocation);
+  }
+
+  public void addAxe() {
+    hasAxe = true;
+  }
+
+  public boolean hasAxe(){
+    return hasAxe;
+  }
+
+  public void addKey(){
+    hasKey = true;
+  }
+
+  public boolean hasKey() {
+    return hasKey;
   }
 
   public Coordinate getCoordinate() {
