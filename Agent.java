@@ -141,6 +141,11 @@ public class Agent {
         }
       }
 
+      // Use a stone, something must be reachable.
+      if(path == "") {
+
+      }
+
       if(path == "") {
         action = getRandomAction();
         System.out.println("RANDOM");
@@ -314,7 +319,7 @@ public class Agent {
      String goalPath = "";
      int goalFinalDir = 5;
 
-     while(!agentToVisit.isEmpty() && !goalToVisit.isEmpty()) {
+     while(!(agentToVisit.isEmpty() && goalToVisit.isEmpty())) {
        if(!agentToVisit.isEmpty()) {
          currAgentState = agentToVisit.poll();
          System.out.println("Agent path choice is " + currAgentState.getSequence());
@@ -578,6 +583,7 @@ public class Agent {
       inventory.put(obj,true);
       break;
       case STEPPING_STONE:
+      spottedTools.remove(obj);
       numSteppingStones++;
      }
    }
