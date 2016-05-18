@@ -51,7 +51,7 @@ public class Agent {
    // Equipment the agent is currently holding.
    Map<Character, Boolean> inventory = new TreeMap<Character, Boolean>();
    private int numStones;
-   // Only tracks location of 1 of each type atm.
+   // Currently only tracks location of 1 of each type.
    private Map<Character, Coordinate> spottedTools = new HashMap<>();
 
    private Coordinate goldPosition;
@@ -192,8 +192,7 @@ public class Agent {
 
    /**
     * Scans the given 5x5 view and updates AI's map with information.
-    * TODO: Change so it doesn't constantly rescan already know information.
-    * Lowercase all roman letters.
+    * TODO: Lowercase all roman letters.
     */
    public void scanView(char view[][]) {
 	   for(int i = 0; i < WINDOW_SIZE; i++) {
@@ -205,11 +204,10 @@ public class Agent {
 				   updateWorld(i, j, value);
 			   }
 
-			   // Store position of gold.
+			   // Store position of gold and tools.
 			   if(value == GOLD && !goldSeen) {
 			   		goldPosition = convertToWorldCoordinate(i,j);
             goldSeen = true;
-            // value == STEPPING_STONE || Doesn't hunt yet
 			   } else if ((inventory.containsKey(value) && !inventory.get(value) &&
                     (value == KEY || value == AXE)) || value == STEPPING_STONE) {
            Coordinate location = convertToWorldCoordinate(i, j);
@@ -257,8 +255,6 @@ public class Agent {
 
    /**
     * Basic strategy to get AI to explore new areas of the environment.
-    * Currently Uni-cost/bfs for UNKNOWN.
-    * Maybe change to iterative deepening.
     * Returns path as list of moves.
     */
    private String conquerTerritory() {
@@ -267,9 +263,7 @@ public class Agent {
      System.out.print("Conquering ");
      System.out.print("AXE is " + axe);
      System.out.println("KEY is " + key);
-    // Speed up by changing to 2D array means immediate lookup. But space.
     Map<Integer, Map<Integer, String>> visited = new HashMap<>();
-    // Can be priority queue later.
     Queue<State> toVisit = new PriorityQueue<State>();
     Coordinate currentPoint = new Coordinate(currRow, currCol);
     State currentState = new State(currentPoint, currDir, 0, "", axe, key, 0); // Don't use stones in territory spread.
@@ -306,8 +300,7 @@ public class Agent {
    /**
     * Given an x and y point returns a path from the agent's current location to
     * that coordinate.
-    * TODO: Currently Bi-directional search. Maybe update to A*.
-    * Putting down stone should be last priority.
+    * TODO: Add stone calculation. Putting down stone should be last priority.
     * Stones should be placed to improve situation after.
     */
    private String findPathToCoordinate(Coordinate destination) {
@@ -343,7 +336,8 @@ public class Agent {
    }
 
    /**
-    * Adds new states to the toVisit list.
+    * Adds new valid states generated from either TURN_LEFT, MOVE_FORWARD,
+    * TURN_RIGHT to the toVisit list.
     */
    private Queue<State> considerChoices(State currentState, Map<Integer, Map<Integer,
                                 String>> visited, Queue<State>toVisit) {
@@ -427,93 +421,6 @@ public class Agent {
    }
 
    /**
-    * Converts the search path from the goal state and combines with path from
-    * agent.
-    */
-   private String combinePaths(String agentPath, int agentFinalDir,
-                          String goalPath, int goalFinalDir) {
-     char[] agentActions = agentPath.toCharArray();
-     char[] goalActions = goalPath.toCharArray();
-     if(agentActions.length == 0 && goalActions.length == 0) {
-       return agentPath;
-     }
-
-     if(agentFinalDir == 5) {
-       agentFinalDir = currDir;
-       for(char action :agentActions) {
-         if(action == TURN_LEFT) {
-           agentFinalDir--;
-           agentFinalDir = (agentFinalDir + 8) % 4;
-         } else if (action == TURN_RIGHT) {
-           agentFinalDir = agentFinalDir + 1 + 4;
-           agentFinalDir %= 4;
-         }
-       }
-     } else {
-       goalFinalDir = NORTH;
-       for(char action: goalActions) {
-           if(action == TURN_LEFT) {
-             goalFinalDir--;
-             goalFinalDir = (goalFinalDir + 8) % 4;
-           } else if (action == TURN_RIGHT) {
-             goalFinalDir = goalFinalDir + 1 + 4;
-             goalFinalDir %= 4;
-           }
-       }
-     }
-     StringBuilder pathBuilder = new StringBuilder(agentPath);
-     // Create a joiner
-     if((agentFinalDir + 2) % 4 != goalFinalDir) {
-       if((agentFinalDir + 1) % 4 == goalFinalDir) {
-         pathBuilder.append(TURN_LEFT);
-       } else if((agentFinalDir - 1 + 4) % 4 == goalFinalDir) {
-         pathBuilder.append(TURN_RIGHT);
-       } else {
-         System.out.println("WARNING: goal and path search error");
-       }
-     }
-     StringBuilder goalReversed = new StringBuilder();
-     for(int i = 0; i < goalActions.length; i++) {
-       char action = goalActions[i];
-       if(action == OPEN_DOOR || action == CUT_DOWN) {
-         int numforwards = 0;
-         StringBuilder toolUse = new StringBuilder();
-         while(numforwards != 2 && i < goalActions.length) {
-           action = goalActions[i];
-           if(action == TURN_LEFT) {
-             action = TURN_RIGHT;
-           } else if(action == TURN_RIGHT) {
-             action = TURN_LEFT;
-           } else if(action == MOVE_FORWARD) {
-             numforwards++;
-           }
-           toolUse.append(action);
-           i++;
-         }
-         i--;
-         goalReversed.insert(0, toolUse.toString());
-       } else {
-         if(action == TURN_LEFT) {
-           action = TURN_RIGHT;
-         } else if (action == TURN_RIGHT) {
-           action = TURN_LEFT;
-         }
-         goalReversed.insert(0, action);
-       }
-     }
-     pathBuilder.append(goalReversed);
-     // Reverse string.
-     return pathBuilder.toString();
-   }
-
-   /**
-    * TODO: Move to be function in State.java.
-    */
-   private boolean sameLocation(State a, State b) {
-     return a.getX() == b.getX() && a.getY() == b.getY();
-   }
-
-   /**
     * Manhattan distance from agent to coordinate.
     * Ignores obstacles along the way.
     * Can modify to include agent turn moves.
@@ -575,7 +482,7 @@ public class Agent {
 	   } else {
        // Catching actions for cutting tree etc.
      }
-     // YOU GOT AN ITEM.
+     // Updates AI with any items it has collected.
      char obj = getObjectAtPoint(new Coordinate(currRow, currCol));
      switch(obj) {
       case GOLD: case AXE: case KEY:
