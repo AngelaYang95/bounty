@@ -133,6 +133,7 @@ public class Agent {
 
 	  scanView(view);
     numShown++;
+
     char action = TURN_LEFT;
     if(journey.isEmpty()) {
       Coordinate currentLocation = new Coordinate(currRow, currCol);
@@ -169,7 +170,9 @@ public class Agent {
 
       // Try to find path to gold that uses stones.
       if(path.isEmpty() && goldSeen && numStones > 0) {
-        path = pathToWin(currentLocation, currDir, numStones, inventory.get(AXE), inventory.get(KEY), new LinkedList<>(), new LinkedList<>());
+        path = pathToWin(currentLocation, currDir, numStones,
+                         inventory.get(AXE), inventory.get(KEY),
+                         new LinkedList<>(), new LinkedList<>());
         createJourney(path);
       }
 
@@ -256,8 +259,12 @@ public class Agent {
 			   if(value == GOLD && !goldSeen) {
 			   		goldPosition = convertToWorldCoordinate(i,j);
             goldSeen = true;
-			   } else if ((inventory.containsKey(value) && !inventory.get(value) &&
-                    (value == KEY || value == AXE)) || value == STEPPING_STONE) {
+			   } else if (((inventory.containsKey(value)) &&
+                     (!inventory.get(value))        &&
+                     ((value == KEY) || (value == AXE)))) {
+           Coordinate location = convertToWorldCoordinate(i, j);
+           spottedTools.put(value, location);
+         } else if(value == STEPPING_STONE) {
            Coordinate location = convertToWorldCoordinate(i, j);
            spottedTools.put(value, location);
          }
@@ -347,10 +354,10 @@ public class Agent {
       Queue<State> toVisit = new PriorityQueue<State>();
 
       // Add initial states.
-      State currentState = new State(currentPoint, currDir, 0, "",
+      State currentState = new State(currentPoint, currDir, "",
                                      inventory.get(AXE), inventory.get(KEY), 0);
       toVisit.add(currentState);
-      currentState = new State(currentPoint, (currDir + 2) % 4, 2, "rr",
+      currentState = new State(currentPoint, (currDir + 2) % 4, "rr",
                                inventory.get(AXE), inventory.get(KEY), 0);
       toVisit.add(currentState);
 
@@ -381,10 +388,10 @@ public class Agent {
       Queue<State> toVisit = new PriorityQueue<State>();
 
       // Add initial states.
-      State currentState = new State(currentPoint, currDir, 0, "",
+      State currentState = new State(currentPoint, currDir, "",
                                      inventory.get(AXE), inventory.get(KEY), 0);
       toVisit.add(currentState);
-      currentState = new State(currentPoint, (currDir + 2) % 4, 2, "rr",
+      currentState = new State(currentPoint, (currDir + 2) % 4, "rr",
                                inventory.get(AXE), inventory.get(KEY), 0);
       toVisit.add(currentState);
 
@@ -421,12 +428,12 @@ public class Agent {
      Queue<State> agentToVisit = new PriorityQueue<State>();
      StringBuilder path = new StringBuilder();
 
-     State currAgentState = new State(from, dir, 0, "", hasAxe, hasKey, stones);
+     State currAgentState = new State(from, dir, "", hasAxe, hasKey, stones);
      currAgentState.addStoneLocations(stoneLocations);
      currAgentState.addStonesHeld(stonesHeld);
      agentToVisit.add(currAgentState);
 
-     currAgentState = new State(from, (dir + 2) % 4, 2, "rr", hasAxe, hasKey, stones);
+     currAgentState = new State(from, (dir + 2) % 4, "rr", hasAxe, hasKey, stones);
      currAgentState.addStoneLocations(stoneLocations);
      currAgentState.addStonesHeld(stonesHeld);
      agentToVisit.add(currAgentState);
@@ -449,11 +456,17 @@ public class Agent {
            return currSequence;
        } else if (currItem == STEPPING_STONE && !currStonesHeld.contains(currLocation)) {
          currAgentState.updateHeldStone();
-         forwardCheckPath = pathToWin(currLocation, currDirection, currNumStones + 1, currHasAxe, currHasKey, currStoneLocations, currStonesHeld);
+         forwardCheckPath = pathToWin(currLocation, currDirection,
+                                      currNumStones + 1, currHasAxe, currHasKey,
+                                      currStoneLocations, currStonesHeld);
        } else if (currItem == AXE && !currHasAxe) {
-         forwardCheckPath = pathToWin(currLocation, currDirection, currNumStones, true, currHasKey, currStoneLocations, currStonesHeld);
+         forwardCheckPath = pathToWin(currLocation, currDirection, currNumStones,
+                                      true, currHasKey, currStoneLocations,
+                                      currStonesHeld);
        } else if (currItem == KEY && !currHasKey) {
-         forwardCheckPath = pathToWin(currLocation, currDirection, currNumStones, currHasAxe, true, currStoneLocations, currStonesHeld);
+         forwardCheckPath = pathToWin(currLocation, currDirection, currNumStones,
+                                      currHasAxe, true, currStoneLocations,
+                                      currStonesHeld);
        } else {
          considerChoices(currAgentState, visitedByAgent, agentToVisit, waterStrat);
          visitedByAgent.add(currLocation);
@@ -474,14 +487,13 @@ public class Agent {
      IStrategy costCalc = new ManhattanHeuristic(destination);
      List<Coordinate> visited = new LinkedList<>();
      Queue<State> toVisit = new PriorityQueue<State>();
-     String path = "";
 
      // Add initial states.
-     State currentState = new State(from, currDir, 0, "", inventory.get(AXE),
-                                      inventory.get(KEY), 0);
+     State currentState = new State(from, currDir, "", inventory.get(AXE),
+                                    inventory.get(KEY), 0);
      toVisit.add(currentState);
-     currentState = new State(from, (currDir + 2) % 4, 2, "rr",
-                                inventory.get(AXE), inventory.get(KEY), 0);
+     currentState = new State(from, (currDir + 2) % 4, "rr", inventory.get(AXE),
+                              inventory.get(KEY), 0);
      toVisit.add(currentState);
 
      while(!toVisit.isEmpty()) {
@@ -497,7 +509,7 @@ public class Agent {
        considerChoices(currentState, visited, toVisit, costCalc);
        visited.add(location);
       }
-      return path;
+      return "";
    }
 
    /*_____________________________________________
@@ -513,7 +525,6 @@ public class Agent {
                                         Queue<State>toVisit, IStrategy costCalc) {
      String actionSequence = currentState.getSequence();
      int prevDirection = currentState.getDirection();
-     int numActions = currentState.getNumActions();
      boolean hasAxe = currentState.hasAxe();
      boolean hasKey = currentState.hasKey();
      int numSteppingStones = currentState.getNumStones();
@@ -521,35 +532,36 @@ public class Agent {
      int y = currentState.getY();
      char obj = getObjectInFront(x, y, prevDirection, 1);
      for(char action: choiceOfMoves) {
-       if(action == MOVE_FORWARD) {
-           if (obj == UNKNOWN || obj == WALL || obj == OUT ||
-              (obj == WATER && numSteppingStones == 0 &&
-              !currentState.hasStoneInFront()) ||
-              (obj == TREE && !hasAxe)||
-              (obj == DOOR && !hasKey)) {
-              continue;
+       if((action == MOVE_FORWARD) &&
+         ((obj == UNKNOWN) ||
+          (obj == WALL) ||
+          (obj == OUT) ||
+          (obj == WATER && numSteppingStones == 0 && !currentState.hasStoneInFront()) ||
+          (obj == TREE && !hasAxe)  ||
+          (obj == DOOR && !hasKey))) {
+
+       } else {
+         Coordinate stateLoc = new Coordinate(x, y);
+         State nextState = new State(stateLoc, prevDirection, actionSequence,
+                                       hasAxe, hasKey, numSteppingStones);
+         nextState.addStoneLocations(currentState.getStoneLocations());
+         nextState.addStonesHeld(currentState.getStonesHeld());
+         nextState.updateWaterWay(currentState.getNumWaterWays());
+         if(action == MOVE_FORWARD) {
+           if (obj == TREE) {
+              nextState.addMove(CUT_DOWN);
+           } else if (obj == DOOR) {
+             nextState.addMove(OPEN_DOOR);
+           } else if (obj == WATER && !currentState.hasStoneInFront()) {
+             nextState.placeStoneInFront();
            }
-       }
-       Coordinate stateLoc = new Coordinate(x, y);
-       State nextState = new State(stateLoc, prevDirection, numActions,
-                             actionSequence, hasAxe, hasKey, numSteppingStones);
-       nextState.addStoneLocations(currentState.getStoneLocations());
-       nextState.addStonesHeld(currentState.getStonesHeld());
-       nextState.updateWaterWay(currentState.getNumWaterWays());
-       if(action == MOVE_FORWARD) {
-         if (obj == TREE) {
-            nextState.addMove(CUT_DOWN);
-         } else if (obj == DOOR) {
-           nextState.addMove(OPEN_DOOR);
-         } else if (obj == WATER && !currentState.hasStoneInFront()) {
-           nextState.placeStoneInFront();
          }
-       }
-       nextState.addMove(action);
-       int cost = costCalc.calcHCost(nextState);
-       nextState.updateCost(cost);
-       if(!visited.contains(nextState.getCoordinate())) {
-         toVisit.add(nextState);
+         nextState.addMove(action);
+         int cost = costCalc.calcHCost(nextState);
+         nextState.updateCost(cost);
+         if(!visited.contains(nextState.getCoordinate())) {
+           toVisit.add(nextState);
+         }
        }
      }
      return toVisit;

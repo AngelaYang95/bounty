@@ -1,6 +1,11 @@
-import java.util.Map;
+/*
+ * State.java
+ *
+ * 06/05/2016
+ */
+
 /**
- * Structure to hold a potential position in map.
+ * Keeps x and y map coordinates.
  */
 public class Coordinate {
 
@@ -20,8 +25,12 @@ public class Coordinate {
 		return y;
 	}
 
-	public void takeStep(int currDir) {
-		switch (currDir) {
+	/**
+	 * Changes the current coordinate so that it is one unit in a direction.
+	 * @param direction 0-3, representing North to West
+	 */
+	public void takeStep(int direction) {
+		switch (direction) {
 		case Agent.NORTH:
 			x--;
 			break;

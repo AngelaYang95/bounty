@@ -1,29 +1,34 @@
+/*
+ * State.java
+ *
+ * 06/05/2016
+ */
 import java.util.*;
+
 /**
- * Structure to hold data in search finding algorithms.
+ * Structure to hold game state in search finding algorithms.
  */
 public class State implements Comparable<State>{
   private Coordinate location;
   private int direction;
+  private int totalCost;
   private StringBuilder actionSequence;
-  private int numActions;
   private int numStones;
-  private List<Coordinate> stoneLocations = new LinkedList<>();
-  private List<Coordinate> stonesHeld = new LinkedList<>();
   private boolean hasKey;
   private boolean hasAxe;
-  private int totalCost;
   private int numWaterWays;
+  private List<Coordinate> stoneLocations = new LinkedList<>();
+  private List<Coordinate> stonesHeld = new LinkedList<>();
 
-  public State(Coordinate start, int startDir, int numActions, String actions, boolean hasAxe, boolean hasKey, int numStones) {
-    this.direction = startDir;
-    location = start;
-    this.numActions = numActions;
+  public State(Coordinate location, int direction, String actions,
+                boolean hasAxe, boolean hasKey, int numStones) {
+    this.location = location;
+    this.direction = direction;
+    totalCost = 0;
     actionSequence = new StringBuilder(actions);
     this.numStones = numStones;
     this.hasAxe = hasAxe;
     this.hasKey = hasKey;
-    totalCost = 0;
     numWaterWays = 0;
   }
 
@@ -48,7 +53,6 @@ public class State implements Comparable<State>{
    */
   public void addMove(char action) {
     actionSequence.append(action);
-    numActions++;
     switch(action) {
       case Agent.TURN_LEFT:
         turnLeft();
@@ -142,18 +146,17 @@ public class State implements Comparable<State>{
   }
 
   public int getNumActions() {
-    return numActions;
+    return actionSequence.length();
+  }
+
+  private int getCost(){
+    return totalCost;
   }
 
   // Used to prioritise States in search.
   @Override
   public int compareTo(State toCompare) {
     return (this.getCost() - toCompare.getCost());
-  }
-
-  // Best by number of actions it takes.
-  private int getCost(){
-    return totalCost;
   }
 
   private void turnLeft() {
