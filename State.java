@@ -9,6 +9,7 @@ public class State implements Comparable<State>{
   private int numActions;
   private int numStones;
   private List<Coordinate> stoneLocations = new LinkedList<>();
+  private List<Coordinate> stonesHeld = new LinkedList<>();
   private boolean hasKey;
   private boolean hasAxe;
   private boolean hCost;
@@ -40,6 +41,19 @@ public class State implements Comparable<State>{
         location.takeStep(direction);
         break;
     }
+  }
+
+  public void addStonesHeld(List<Coordinate> stonePoints) {
+    stonesHeld.addAll(stonePoints);
+  }
+
+  public void updateHeldStone() {
+    Coordinate stoneLocation = new Coordinate(location.getX(), location.getY());
+    stonesHeld.add(stoneLocation);
+  }
+
+  public List<Coordinate> getStonesHeld() {
+    return stonesHeld;
   }
 
   public int getNumStones() {

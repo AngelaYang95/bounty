@@ -60,6 +60,8 @@ public class Agent {
    private boolean hasWonGame;
    private LinkedList<Character> journey = new LinkedList<>();
 
+   private int turn;
+
    private int numShown;
 
    public Agent() {
@@ -74,6 +76,7 @@ public class Agent {
      goldIsReachable = false;
      goldSeen = false;
      hasWonGame = false;
+     turn = 0;
 
      numShown = 0;
 	   // Initialize the World Map to be all UNKNOWNs.
@@ -86,6 +89,7 @@ public class Agent {
     * Given a view of it's surroundings, returns an action.
     */
    public char get_action( char view[][] ) {
+     turn++;
      if(numShown == 25) {
        numShown = 0;
        System.out.print("Next 25 steps");
@@ -110,6 +114,7 @@ public class Agent {
     */
     char action = TURN_LEFT;
     if(journey.isEmpty()) {
+      Coordinate agentCurrLoc = new Coordinate(currRow, currCol);
       String path = "";
       if(inventory.get(GOLD)) {
         path = findPathToCoordinate(initialLocation);
@@ -117,8 +122,9 @@ public class Agent {
       }
 
       // Look for path to GOLD.
-      if(goldSeen && path == "") {
-        path = findPathToCoordinate(goldPosition);
+      if(goldSeen && path == "" && turn > 10) {
+        //path = findPathToCoordinate(goldPosition);
+        path = pathToWin(agentCurrLoc, currDir, numStones, inventory.get(AXE), inventory.get(KEY), new LinkedList<>(), new LinkedList<>());
         createJourney(path);
         System.out.println("Gold search " + path);
       }
@@ -260,32 +266,43 @@ public class Agent {
    private String conquerTerritory() {
      boolean axe = inventory.get(AXE);
      boolean key = inventory.get(KEY);
-     System.out.print("Conquering ");
-     System.out.print("AXE is " + axe);
-     System.out.println("KEY is " + key);
-    Map<Integer, Map<Integer, String>> visited = new HashMap<>();
-    Queue<State> toVisit = new PriorityQueue<State>();
-    Coordinate currentPoint = new Coordinate(currRow, currCol);
-    State currentState = new State(currentPoint, currDir, 0, "", axe, key, 0); // Don't use stones in territory spread.
-    toVisit.add(currentState);
-    currentState = new State(currentPoint, (currDir + 2) % 4, 2, "rr", axe, key, 0);
-    toVisit.add(currentState);
-    String path = "";
-    // BFS
-    while(!toVisit.isEmpty()) {
-        currentState = toVisit.poll();
-        String actionSequence = currentState.getSequence();
-        if(getObjectInFront(currentState.getX(), currentState.getY(),
-                    currentState.getDirection(), 2) == UNKNOWN ||
-           getObjectInFront(currentState.getX(), currentState.getY(),
-                    currentState.getDirection(), 1) == UNKNOWN) {
-            path = actionSequence;
-            break;
-        }
-        toVisit = considerChoices(currentState, visited, toVisit);
-        visited = addToVisitedMap(visited, currentState);
-    }
-	  return path;
+      Map<Integer, Map<Integer, String>> visited = new HashMap<>();
+      Queue<State> toVisit = new PriorityQueue<State>();
+      Coordinate currentPoint = new Coordinate(currRow, currCol);
+      State currentState = new State(currentPoint, currDir, 0, "", axe, key, 0); // Don't use stones in territory spread.
+      toVisit.add(currentState);
+      currentState = new State(currentPoint, (currDir + 2) % 4, 2, "rr", axe, key, 0);
+      toVisit.add(currentState);
+      String path = "";
+      // BFS
+      while(!toVisit.isEmpty()) {
+          currentState = toVisit.poll();
+          int currX = currentState.getX();
+          int currY = currentState.getY();
+          String actionSequence = currentState.getSequence();
+          // This search is like bfs.
+          for(int i = 0; i < WINDOW_SIZE; i++) {
+            for(int j = 0; j < WINDOW_SIZE; j++) {
+              int viewX = i - VIEW_OFFSET + currX;
+              int viewY = j - VIEW_OFFSET + currY;
+              if(getObjectAtPoint(new Coordinate(viewX, viewY)) == UNKNOWN) {
+                path = actionSequence;
+                break;
+              }
+            }
+          }
+          // More like dfs.
+          /*if(getObjectInFront(currentState.getX(), currentState.getY(),
+                      currentState.getDirection(), 2) == UNKNOWN ||
+             getObjectInFront(currentState.getX(), currentState.getY(),
+                      currentState.getDirection(), 1) == UNKNOWN) {
+              path = actionSequence;
+              break;
+          }*/
+          toVisit = considerChoices(currentState, visited, toVisit);
+          visited = addToVisitedMap(visited, currentState);
+      }
+  	  return path;
    }
 
    /**
@@ -295,6 +312,68 @@ public class Agent {
      int x = point.getX();
      int y = point.getY();
      return worldMap[x][y];
+   }
+   /**
+    * Given an x and y point returns a path from the agent's current location to
+    * that coordinate.
+    * TODO: Add stone calculation. Putting down stone should be last priority.
+    * Stones should be placed to improve situation after.
+    * pathToWin(inventory.get(AXE), inventory.get(KEY));
+    * Need water heuristic.
+    */
+   private String pathToWin(Coordinate from, int dir, int stones, boolean hasAxe, boolean hasKey, List<Coordinate> stoneLocations, List<Coordinate> stonesHeld) {
+     // Structures needed for Agent's side of search.
+     Map<Integer, Map<Integer, String>> visitedByAgent = new HashMap<>();
+     Queue<State> agentToVisit = new PriorityQueue<State>();
+     String agentPath = "";
+
+     State currAgentState = new State(from, dir, 0, "", hasAxe, hasKey, stones);
+     currAgentState.addStoneLocations(stoneLocations);
+     currAgentState.addStonesHeld(stonesHeld);
+     agentToVisit.add(currAgentState);
+     currAgentState = new State(from, (dir + 2) % 4, 2, "rr", hasAxe, hasKey, stones);
+     currAgentState.addStoneLocations(stoneLocations);
+     currAgentState.addStonesHeld(stonesHeld);
+     agentToVisit.add(currAgentState);
+
+     while(!agentToVisit.isEmpty()) {
+       currAgentState = agentToVisit.poll();
+
+       Coordinate currLocation = currAgentState.getCoordinate();
+       int currDirection = currAgentState.getDirection();
+       int currNumStones = currAgentState.getNumStones();
+       boolean currHasAxe = currAgentState.hasAxe();
+       boolean currHasKey = currAgentState.hasKey();
+       List<Coordinate> currStoneLocations = currAgentState.getStoneLocations();
+       List<Coordinate> currStonesHeld = currAgentState.getStonesHeld();
+       String currSequence = currAgentState.getSequence();
+       String forwardCheckPath = "";
+       System.out.println("Agent path is " + currSequence);
+
+       char currItem = getObjectAtPoint(currLocation);
+       if(currItem == GOLD) {
+           agentPath = currSequence;
+           break;
+       } else if (currItem == STEPPING_STONE && !currStonesHeld.contains(currLocation)) {
+         System.out.println("INSIDE STONE");
+         currAgentState.updateHeldStone();
+         forwardCheckPath = pathToWin(currLocation, currDirection, currNumStones + 1, currHasAxe, currHasKey, currStoneLocations, currStonesHeld);
+       } else if (currItem == AXE && !currHasAxe) {
+         forwardCheckPath = pathToWin(currLocation, currDirection, currNumStones, true, currHasKey, currStoneLocations, currStonesHeld);
+       } else if (currItem == KEY && !currHasKey) {
+         forwardCheckPath = pathToWin(currLocation, currDirection, currNumStones, currHasAxe, true, currStoneLocations, currStonesHeld);
+       } else {
+         considerChoices(currAgentState, visitedByAgent, agentToVisit);
+         addToVisitedMap(visitedByAgent, currAgentState);
+       }
+
+       if(forwardCheckPath != "") {
+         agentPath = currSequence + forwardCheckPath; // Use string builder.
+         break;
+       }
+
+      }
+      return agentPath;
    }
 
    /**
@@ -307,16 +386,13 @@ public class Agent {
      boolean hasAxe = inventory.get(AXE);
      boolean hasKey = inventory.get(KEY);
 
-     System.out.println("searching for " + destination.getX() + "," + destination.getY());
-     System.out.println("AXE is " + hasAxe);
-     System.out.println("KEY is " + hasKey);
      // Structures needed for Agent's side of search.
      Map<Integer, Map<Integer, String>> visitedByAgent = new HashMap<>();
      Queue<State> agentToVisit = new PriorityQueue<State>();
      Coordinate agentCurrPoint = new Coordinate(currRow, currCol);
-     State currAgentState = new State(agentCurrPoint, currDir, 0, "", hasAxe, hasKey, numStones);
+     State currAgentState = new State(agentCurrPoint, currDir, 0, "", hasAxe, hasKey, 0);
      agentToVisit.add(currAgentState);
-     currAgentState = new State(agentCurrPoint, (currDir + 2) % 4, 2, "rr", hasAxe, hasKey, numStones);
+     currAgentState = new State(agentCurrPoint, (currDir + 2) % 4, 2, "rr", hasAxe, hasKey, 0);
      agentToVisit.add(currAgentState);
      String agentPath = "";
 
@@ -331,7 +407,6 @@ public class Agent {
        considerChoices(currAgentState, visitedByAgent, agentToVisit);
        addToVisitedMap(visitedByAgent, currAgentState);
       }
-      System.out.println("Agent path is " + agentPath);
       return agentPath;
    }
 
@@ -363,17 +438,16 @@ public class Agent {
        State nextState = new State(stateLoc, prevDirection, numActions,
                              actionSequence, hasAxe, hasKey, numSteppingStones);
        nextState.addStoneLocations(currentState.getStoneLocations());
+       nextState.addStonesHeld(currentState.getStonesHeld());
        if(action == MOVE_FORWARD) {
          if (obj == TREE) {
             nextState.addMove(CUT_DOWN);
          } else if (obj == DOOR) {
            nextState.addMove(OPEN_DOOR);
-         } else if(obj == KEY) {
+         /*} else if(obj == KEY) {
            nextState.addKey();
          } else if(obj == AXE) {
-           nextState.addAxe();
-         } else if (obj == STEPPING_STONE) {
-           nextState.addStone();
+           nextState.addAxe();*/
          } else if (obj == WATER && !currentState.hasStoneInFront()) {
            nextState.placeStoneInFront();
          }
