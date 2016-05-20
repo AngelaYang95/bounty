@@ -182,6 +182,47 @@ public class Agent {
    }
 
    /**
+    * Updates agent with it's new location after it makes the next action.
+    * AI attempting to walk through walls will break it's worldMap.
+    */
+   private void updateNewPosition(char action) {
+     System.out.println("NEXT MOVE IS " + action);
+    if(action == TURN_LEFT) {
+       currDir = ((currDir - 1) + 8) % 4;  // Java's % gives only remainder.
+     } else if (action == TURN_RIGHT) {
+      currDir = (currDir + 1) % 4;
+    } else if (action == MOVE_FORWARD) {
+      if(currDir == NORTH) {
+        currRow--;
+      } else if(currDir == EAST) {
+        currCol++;
+      } else if(currDir == SOUTH) {
+        currRow++;
+      } else {
+        currCol--;
+      }
+    } else {
+       // Catching actions for cutting tree etc.
+    }
+
+     // Updates inventory with any items it has collected.
+     char obj = getObjectAtPoint(new Coordinate(currRow, currCol));
+     switch(obj) {
+      case GOLD: case AXE: case KEY:
+        spottedTools.remove(obj);
+        inventory.put(obj,true);
+        break;
+      case STEPPING_STONE:
+        spottedTools.remove(obj);
+        numStones++;
+        break;
+      case WATER:
+        numStones--;
+        break;
+     }
+   }
+
+   /**
     * Scans the given 5x5 view and updates AI's map with information.
     */
    public void scanView(char view[][]) {
@@ -417,27 +458,28 @@ public class Agent {
 
    /**
     * Finds path from one location to a destination.
-    *
     */
    private String findPathToCoordinate(Coordinate from, Coordinate destination) {
      IStrategy costCalc = new ManhattanHeuristic(destination);
-     boolean hasAxe = inventory.get(AXE);
-     boolean hasKey = inventory.get(KEY);
-
-     // Structures needed for Agent's side of search.
      Map<Integer, Map<Integer, String>> visitedByAgent = new HashMap<>();
      Queue<State> agentToVisit = new PriorityQueue<State>();
-     State currAgentState = new State(from, currDir, 0, "", hasAxe, hasKey, 0);
-     agentToVisit.add(currAgentState);
-     currAgentState = new State(from, (currDir + 2) % 4, 2, "rr", hasAxe, hasKey, 0);
-     agentToVisit.add(currAgentState);
      String agentPath = "";
 
+     // Add initial states.
+     State currAgentState = new State(from, currDir, 0, "", inventory.get(AXE),
+                                      inventory.get(KEY), 0);
+     agentToVisit.add(currAgentState);
+     currAgentState = new State(from, (currDir + 2) % 4, 2, "rr",
+                                inventory.get(AXE), inventory.get(KEY), 0);
+     agentToVisit.add(currAgentState);
+
      while(!agentToVisit.isEmpty()) {
+       /*} else if(obj == KEY) {
+         nextState.addKey();
+       } else if(obj == AXE) {
+         nextState.addAxe();*/
        currAgentState = agentToVisit.poll();
        if(currAgentState.getCoordinate().equals(destination)) {
-           int agentXCo = currAgentState.getX();
-           int agentYCo = currAgentState.getY();
            agentPath = currAgentState.getSequence();
            break;
        }
@@ -447,6 +489,11 @@ public class Agent {
       return agentPath;
    }
 
+   /*_____________________________________________
+      Below are helper functions for searches.
+     _____________________________________________
+   */
+   // TODO: make coordinate map a private class.
    /**
     * Adds new valid states generated from either TURN_LEFT, MOVE_FORWARD,
     * TURN_RIGHT to the toVisit list.
@@ -482,16 +529,11 @@ public class Agent {
             nextState.addMove(CUT_DOWN);
          } else if (obj == DOOR) {
            nextState.addMove(OPEN_DOOR);
-         /*} else if(obj == KEY) {
-           nextState.addKey();
-         } else if(obj == AXE) {
-           nextState.addAxe();*/
          } else if (obj == WATER && !currentState.hasStoneInFront()) {
            nextState.placeStoneInFront();
          }
        }
        nextState.addMove(action);
-
        int cost = costCalc.calcHCost(nextState);
        nextState.updateCost(cost);
        if(!isVisited(visited, nextState.getCoordinate())) {
@@ -516,7 +558,7 @@ public class Agent {
    }
 
    /**
-    * Adds new State to map.
+    * Adds new State to Coordinate map.
     */
    private Map<Integer, Map<Integer, String>> addToVisitedMap(Map<Integer, Map<Integer, String>>visited,
                                 State searchState) {
@@ -536,18 +578,7 @@ public class Agent {
    }
 
    /**
-    * Manhattan distance from agent to coordinate.
-    * Ignores obstacles along the way.
-    * Can modify to include agent turn moves.
-    */
-   private int calculateManhattan (Coordinate destination) {
-     int destX = destination.getX();
-     int destY = destination.getY();
-     return Math.abs(currRow - destX) + Math.abs(currCol - destY);
-   }
-
-   /**
-    * Given two coordinates and a direction, finds what is in front of this
+    * Given coordinates and a direction, finds what is in front of this
     * position.
     */
    private char getObjectInFront(int xInWorld, int yInWorld, int direction, int numSpots) {
@@ -571,48 +602,6 @@ public class Agent {
   		} else {
   			return worldMap[xInWorld][yInWorld];
   		}
-   }
-
-   /**
-    * Updates agent with it's own location for the move it's about to make.
-    * Trusting that AI doesn't make any false moves.
-    * AI attempting to walk through wall will break it's worldMap.
-    */
-   private void updateNewPosition(char action) {
-     System.out.println("NEXT MOVE IS " + action);
-	   if(action == TURN_LEFT) {
-       currDir = ((currDir - 1) + 8) % 4;  // Java's % gives only remainder.
-     } else if (action == TURN_RIGHT) {
-		   currDir = (currDir + 1) % 4;
-	   } else if (action == MOVE_FORWARD) {
-		   if(currDir == NORTH) {
-			   currRow--;
-		   } else if(currDir == EAST) {
-			   currCol++;
-		   } else if(currDir == SOUTH) {
-			   currRow++;
-		   } else {
-			   currCol--;
-		   }
-	   } else {
-       // Catching actions for cutting tree etc.
-     }
-     // Updates AI with any items it has collected.
-     char obj = getObjectAtPoint(new Coordinate(currRow, currCol));
-     switch(obj) {
-      case GOLD: case AXE: case KEY:
-      spottedTools.remove(obj);
-      inventory.put(obj,true);
-      break;
-      case STEPPING_STONE:
-      spottedTools.remove(obj);
-      numStones++;
-      break;
-      case WATER:
-      numStones--;
-      break;
-     }
-     System.out.println("Number of stones is " + numStones);
    }
 
    public static void main( String[] args )
