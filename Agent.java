@@ -1,9 +1,48 @@
 /*********************************************
- *  Agent.java
- *  Sample Agent for Text-Based Adventure Game
  *  COMP3411 Artificial Intelligence
  *  UNSW Session 1, 2016
+ *  Tom He & Angela Yang
+
+QUESTION ANSW:
+The agent keeps information of the game state in the following structures:
+  - Agent keeps it's own copy of the game terrain in worldMap[][] which is 4 times
+    the max game size. The agent always starts in the middle of the world map.
+    All locations where the agent hasn't seen yet are marked as UNKNOWN. Each
+    5 x 5 views is mapped onto worldMap[][] relative to agent's current
+    direction and position.
+  - The tools it currently has in Map<> Inventory excluding stones.
+  - The number of stones we have on hand.
+  - Coordinate location of spotted axes, keys or stones; each in their own Set.
+  - Whether the gold has been seen & whether we have the gold in hand.
+  - The agent's initial location which will always be the middle of the worldMap.
+
+Logic Flow:
+The agent first scans in the 5 x 5 view of the game and updates itself with new
+information.
+The agent keeps a List<>journey of actions it should take. The agent takes the
+first action off that list. The agent has a series of search methods to populate
+the list if it is empty. All the searches are variations of A* searches or BFS.
+They are prioritise and called as follows:
+1. We're holding GOLD -> search for a journey back to original location.
+2. GOLD has been seen -> try search a journey to gold without using stones.
+   This is an A* search with Manhattan Distance Heuristic.
+3. Tools have been seen -> try search a journey to one of these tools without
+   using stones. This is an A* search with Manhattan Distance Heuristic.
+4. Explore new territory A. This search will result in AI going deep into an
+   area. It only looks at the what is reachable in front of it.
+5. Gold has been seen & we're holding stones -> Search for a journey to GOLD
+   using the stones we have. Stones are precious so we will only deploy them
+   if we can find a path to GOLD. This search is recursive.
+   The waterHeuristic calculates the state cost by number of stones used since
+   for every location, we want to take the path to get there with least number
+   of stones. Everytime a tool is picked up, the search recurses as a means to
+   forward check that
+6. Explore new territory B. This search will result in AI doing a shallow but
+   thorough search. We use this after A.
+7. If none of the above worked, the agent chooses a random action that won't
+   result in it dying.
 */
+
 
 import java.util.*;
 import java.io.*;
@@ -56,12 +95,7 @@ public class Agent {
 
    private Coordinate goldPosition;
    private boolean goldSeen;
-   private boolean goldIsReachable;
-   private boolean hasWonGame;
    private LinkedList<Character> journey = new LinkedList<>();
-
-   private int turn;
-
    private int numShown;
 
    public Agent() {
@@ -73,10 +107,7 @@ public class Agent {
 	   inventory.put(KEY, false);
      inventory.put(GOLD, false);
 	   numStones = 0;
-     goldIsReachable = false;
      goldSeen = false;
-     hasWonGame = false;
-     turn = 0;
 
      numShown = 0;
 	   // Initialize the World Map to be all UNKNOWNs.
@@ -89,7 +120,6 @@ public class Agent {
     * Given a view of it's surroundings, returns an action.
     */
    public char get_action( char view[][] ) {
-     turn++;
      if(numShown == 25) {
        numShown = 0;
        System.out.print("Next 25 steps");
@@ -103,15 +133,6 @@ public class Agent {
 
 	  scanView(view);
     numShown++;
-	  /* Decision making for what action to take.
-    Priority:
-    1. Current journey
-    2. If we have gold, find path back to initial position.
-    3. Makes an attempt to get to Gold.
-    4. Tries to get the tools it has seen.
-    5. Tries to explore new spaces.
-    5. Reverts to random movement if nothing else is good.
-    */
     char action = TURN_LEFT;
     if(journey.isEmpty()) {
       Coordinate currentLocation = new Coordinate(currRow, currCol);
@@ -461,32 +482,33 @@ public class Agent {
     */
    private String findPathToCoordinate(Coordinate from, Coordinate destination) {
      IStrategy costCalc = new ManhattanHeuristic(destination);
-     Map<Integer, Map<Integer, String>> visitedByAgent = new HashMap<>();
-     Queue<State> agentToVisit = new PriorityQueue<State>();
-     String agentPath = "";
+     Map<Integer, Map<Integer, String>> visited = new HashMap<>();
+     Queue<State> toVisit = new PriorityQueue<State>();
+     String path = "";
 
      // Add initial states.
-     State currAgentState = new State(from, currDir, 0, "", inventory.get(AXE),
+     State currentState = new State(from, currDir, 0, "", inventory.get(AXE),
                                       inventory.get(KEY), 0);
-     agentToVisit.add(currAgentState);
-     currAgentState = new State(from, (currDir + 2) % 4, 2, "rr",
+     toVisit.add(currentState);
+     currentState = new State(from, (currDir + 2) % 4, 2, "rr",
                                 inventory.get(AXE), inventory.get(KEY), 0);
-     agentToVisit.add(currAgentState);
+     toVisit.add(currentState);
 
-     while(!agentToVisit.isEmpty()) {
-       /*} else if(obj == KEY) {
-         nextState.addKey();
-       } else if(obj == AXE) {
-         nextState.addAxe();*/
-       currAgentState = agentToVisit.poll();
-       if(currAgentState.getCoordinate().equals(destination)) {
-           agentPath = currAgentState.getSequence();
+     while(!toVisit.isEmpty()) {
+       currentState = toVisit.poll();
+       Coordinate location = currentState.getCoordinate();
+       if(location.equals(destination)) {
+           path = currentState.getSequence();
            break;
+       } else if(getObjectAtPoint(location) == KEY) {
+          currentState.addKey();
+       } else if(getObjectAtPoint(location) == AXE) {
+         currentState.addAxe();
        }
-       considerChoices(currAgentState, visitedByAgent, agentToVisit, costCalc);
-       addToVisitedMap(visitedByAgent, currAgentState);
+       considerChoices(currentState, visited, toVisit, costCalc);
+       addToVisitedMap(visited, currentState);
       }
-      return agentPath;
+      return path;
    }
 
    /*_____________________________________________
@@ -510,14 +532,15 @@ public class Agent {
      int y = currentState.getY();
      char obj = getObjectInFront(x, y, prevDirection, 1);
      for(char action: choiceOfMoves) {
-       if(action == MOVE_FORWARD && (obj == UNKNOWN || obj == WALL ||
-                                     obj == OUT     ||
-                                     (obj == WATER && numSteppingStones == 0 && !currentState.hasStoneInFront()) ||
-                                     (obj == TREE && !currentState.hasAxe())||
-                                     (obj == DOOR && !currentState.hasKey()))) {
-         continue;
+       if(action == MOVE_FORWARD) {
+           if (obj == UNKNOWN || obj == WALL || obj == OUT ||
+              (obj == WATER && numSteppingStones == 0 &&
+              !currentState.hasStoneInFront()) ||
+              (obj == TREE && !hasAxe)||
+              (obj == DOOR && !hasKey)) {
+              continue;
+           }
        }
-
        Coordinate stateLoc = new Coordinate(x, y);
        State nextState = new State(stateLoc, prevDirection, numActions,
                              actionSequence, hasAxe, hasKey, numSteppingStones);
