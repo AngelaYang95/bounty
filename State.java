@@ -5,7 +5,7 @@ import java.util.*;
 public class State implements Comparable<State>{
   private Coordinate location;
   private int direction;
-  private String actionSequence;
+  private StringBuilder actionSequence;
   private int numActions;
   private int numStones;
   private List<Coordinate> stoneLocations = new LinkedList<>();
@@ -19,7 +19,7 @@ public class State implements Comparable<State>{
     this.direction = startDir;
     location = start;
     this.numActions = numActions;
-    actionSequence = actions;
+    actionSequence = new StringBuilder(actions);
     this.numStones = numStones;
     this.hasAxe = hasAxe;
     this.hasKey = hasKey;
@@ -47,7 +47,7 @@ public class State implements Comparable<State>{
    * Updates entire state with new action.
    */
   public void addMove(char action) {
-    actionSequence += action;
+    actionSequence.append(action);
     numActions++;
     switch(action) {
       case Agent.TURN_LEFT:
@@ -138,7 +138,7 @@ public class State implements Comparable<State>{
   }
 
   public String getSequence() {
-    return actionSequence;
+    return actionSequence.toString();
   }
 
   public int getNumActions() {

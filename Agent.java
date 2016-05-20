@@ -346,9 +346,8 @@ public class Agent {
     */
    private String exploreA(Coordinate currentPoint) {
       IStrategy costCalc = new ActionsHeuristic();
-      Map<Integer, Map<Integer, String>> visited = new HashMap<>();
+      List<Coordinate> visited = new LinkedList<>();
       Queue<State> toVisit = new PriorityQueue<State>();
-      String path = "";
 
       // Add initial states.
       State currentState = new State(currentPoint, currDir, 0, "",
@@ -362,19 +361,16 @@ public class Agent {
           currentState = toVisit.poll();
           int currX = currentState.getX();
           int currY = currentState.getY();
-          String actionSequence = currentState.getSequence();
+          int currDirection = currentState.getDirection();
 
-          if(getObjectInFront(currentState.getX(), currentState.getY(),
-                      currentState.getDirection(), 2) == UNKNOWN ||
-             getObjectInFront(currentState.getX(), currentState.getY(),
-                      currentState.getDirection(), 1) == UNKNOWN) {
-              path = actionSequence;
-              break;
+          if(getObjectInFront(currX, currY, currDirection, 2) == UNKNOWN ||
+             getObjectInFront(currX, currY, currDirection, 1) == UNKNOWN) {
+              return currentState.getSequence();
           }
           toVisit = considerChoices(currentState, visited, toVisit, costCalc);
-          visited = addToVisitedMap(visited, currentState);
+          visited.add(currentState.getCoordinate());
       }
-  	  return path;
+  	  return "";
    }
 
    /**
@@ -384,9 +380,8 @@ public class Agent {
     */
    private String exploreB(Coordinate currentPoint) {
       IStrategy costCalc = new ActionsHeuristic();
-      Map<Integer, Map<Integer, String>> visited = new HashMap<>();
+      List<Coordinate> visited = new LinkedList<>();
       Queue<State> toVisit = new PriorityQueue<State>();
-      String path = "";
 
       // Add initial states.
       State currentState = new State(currentPoint, currDir, 0, "",
@@ -400,22 +395,20 @@ public class Agent {
           currentState = toVisit.poll();
           int currX = currentState.getX();
           int currY = currentState.getY();
-          String actionSequence = currentState.getSequence();
-          // This search is like bfs.
+
           for(int i = 0; i < WINDOW_SIZE; i++) {
             for(int j = 0; j < WINDOW_SIZE; j++) {
               int viewX = i - VIEW_OFFSET + currX;
               int viewY = j - VIEW_OFFSET + currY;
               if(getObjectAtPoint(new Coordinate(viewX, viewY)) == UNKNOWN) {
-                path = actionSequence;
-                break;
+                return currentState.getSequence();
               }
             }
           }
-          toVisit = considerChoices(currentState, visited, toVisit, costCalc);
-          visited = addToVisitedMap(visited, currentState);
+          considerChoices(currentState, visited, toVisit, costCalc);
+          visited.add(currentState.getCoordinate());
       }
-     return path;
+      return "";
    }
 
    /**
@@ -427,7 +420,7 @@ public class Agent {
                             boolean hasKey, List<Coordinate> stoneLocations,
                             List<Coordinate> stonesHeld) {
      IStrategy waterStrat = new WaterHeuristic();
-     Map<Integer, Map<Integer, String>> visitedByAgent = new HashMap<>();
+     List<Coordinate> visitedByAgent = new LinkedList<>();
      Queue<State> agentToVisit = new PriorityQueue<State>();
      String agentPath = "";
 
@@ -467,7 +460,7 @@ public class Agent {
          forwardCheckPath = pathToWin(currLocation, currDirection, currNumStones, currHasAxe, true, currStoneLocations, currStonesHeld);
        } else {
          considerChoices(currAgentState, visitedByAgent, agentToVisit, waterStrat);
-         addToVisitedMap(visitedByAgent, currAgentState);
+         visitedByAgent.add(currLocation);
        }
        if(forwardCheckPath != "") {
          agentPath = currSequence + forwardCheckPath; // Use string builder.
@@ -482,7 +475,7 @@ public class Agent {
     */
    private String findPathToCoordinate(Coordinate from, Coordinate destination) {
      IStrategy costCalc = new ManhattanHeuristic(destination);
-     Map<Integer, Map<Integer, String>> visited = new HashMap<>();
+     List<Coordinate> visited = new LinkedList<>();
      Queue<State> toVisit = new PriorityQueue<State>();
      String path = "";
 
@@ -506,7 +499,7 @@ public class Agent {
          currentState.addAxe();
        }
        considerChoices(currentState, visited, toVisit, costCalc);
-       addToVisitedMap(visited, currentState);
+       visited.add(location);
       }
       return path;
    }
@@ -520,8 +513,8 @@ public class Agent {
     * Adds new valid states generated from either TURN_LEFT, MOVE_FORWARD,
     * TURN_RIGHT to the toVisit list.
     */
-   private Queue<State> considerChoices(State currentState, Map<Integer, Map<Integer,
-                                String>> visited, Queue<State>toVisit, IStrategy costCalc) {
+   private Queue<State> considerChoices(State currentState, List<Coordinate> visited,
+                                        Queue<State>toVisit, IStrategy costCalc) {
      String actionSequence = currentState.getSequence();
      int prevDirection = currentState.getDirection();
      int numActions = currentState.getNumActions();
@@ -559,45 +552,11 @@ public class Agent {
        nextState.addMove(action);
        int cost = costCalc.calcHCost(nextState);
        nextState.updateCost(cost);
-       if(!isVisited(visited, nextState.getCoordinate())) {
+       if(!visited.contains(nextState.getCoordinate())) {
          toVisit.add(nextState);
        }
      }
      return toVisit;
-   }
-
-   /**
-    * Checks if a Coordinate point exists in a map.
-    */
-   private boolean isVisited(Map<Integer, Map<Integer, String>> map, Coordinate point) {
-     int x = point.getX();
-     int y = point.getY();
-     if(map.containsKey(x)) {
-       if(map.get(x).containsKey(y)) {
-         return true;
-       }
-     }
-     return false;
-   }
-
-   /**
-    * Adds new State to Coordinate map.
-    */
-   private Map<Integer, Map<Integer, String>> addToVisitedMap(Map<Integer, Map<Integer, String>>visited,
-                                State searchState) {
-          int x = searchState.getX();
-          int y = searchState.getY();
-          String path = searchState.getSequence();
-          if(visited.containsKey(x)) {
-            if(!visited.get(x).containsKey(y)) {
-              visited.get(x).put(y, path);
-            }
-          } else {
-            Map<Integer, String> yToPath = new HashMap<>();
-            yToPath.put(y, path);
-            visited.put(x, yToPath);
-          }
-          return visited;
    }
 
    /**
