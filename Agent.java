@@ -2,8 +2,10 @@
  *  COMP3411 Artificial Intelligence
  *  UNSW Session 1, 2016
  *  Tom He & Angela Yang
+ */
 
-QUESTION ANSW:
+/*
+QUESTION ANSWER:
 The agent keeps information of the game state in the following structures:
   - Agent keeps it's own copy of the game terrain in worldMap[][] which is 4 times
     the max game size. The agent always starts in the middle of the world map.
@@ -38,11 +40,10 @@ They are prioritise and called as follows:
    of stones. Everytime a tool is picked up, the search recurses as a means to
    forward check that
 6. Explore new territory B. This search will result in AI doing a shallow but
-   thorough search. We use this after A.
+   thorough search. We use this after A as a means to cover ground at the start.
 7. If none of the above worked, the agent chooses a random action that won't
    result in it dying.
 */
-
 
 import java.util.*;
 import java.io.*;
@@ -92,9 +93,9 @@ public class Agent {
    private int numStones;
    // Currently only tracks location of 1 of each type.
    private Map<Character, Coordinate> spottedTools = new HashMap<>();
-
    private Coordinate goldPosition;
    private boolean goldSeen;
+
    private LinkedList<Character> journey = new LinkedList<>();
    private int numShown;
 
@@ -110,8 +111,7 @@ public class Agent {
      goldSeen = false;
 
      numShown = 0;
-	   // Initialize the World Map to be all UNKNOWNs.
-	   for(char[] row: worldMap) {
+	   for(char[] row: worldMap) { // Initialize the World Map to be all UNKNOWNs.
 		   Arrays.fill(row, UNKNOWN);
 	   }
    }
@@ -454,16 +454,17 @@ public class Agent {
        char currItem = getObjectAtPoint(currLocation);
        if(currItem == GOLD) {
            return currSequence;
-       } else if (currItem == STEPPING_STONE && !currStonesHeld.contains(currLocation)) {
+       } else if ((currItem == STEPPING_STONE) &&
+                  (!currStonesHeld.contains(currLocation))) {
          currAgentState.updateHeldStone();
          forwardCheckPath = pathToWin(currLocation, currDirection,
                                       currNumStones + 1, currHasAxe, currHasKey,
                                       currStoneLocations, currStonesHeld);
-       } else if (currItem == AXE && !currHasAxe) {
+       } else if ((currItem == AXE) && (!currHasAxe)) {
          forwardCheckPath = pathToWin(currLocation, currDirection, currNumStones,
                                       true, currHasKey, currStoneLocations,
                                       currStonesHeld);
-       } else if (currItem == KEY && !currHasKey) {
+       } else if ((currItem == KEY) && (!currHasKey)) {
          forwardCheckPath = pathToWin(currLocation, currDirection, currNumStones,
                                       currHasAxe, true, currStoneLocations,
                                       currStonesHeld);
