@@ -12,7 +12,8 @@ public class State implements Comparable<State>{
   private List<Coordinate> stonesHeld = new LinkedList<>();
   private boolean hasKey;
   private boolean hasAxe;
-  private boolean hCost;
+  private int totalCost;
+  private int numWaterWays;
 
   public State(Coordinate start, int startDir, int numActions, String actions, boolean hasAxe, boolean hasKey, int numStones) {
     this.direction = startDir;
@@ -22,6 +23,24 @@ public class State implements Comparable<State>{
     this.numStones = numStones;
     this.hasAxe = hasAxe;
     this.hasKey = hasKey;
+    totalCost = 0;
+    numWaterWays = 0;
+  }
+
+  public void addWaterWay() {
+    numWaterWays++;
+  }
+
+  public void updateWaterWay(int numWater) {
+    this.numWaterWays = numWater;
+  }
+
+  public int getNumWaterWays() {
+    return numWaterWays;
+  }
+
+  public void updateCost(int cost) {
+      totalCost = cost;
   }
 
   /**
@@ -74,6 +93,7 @@ public class State implements Comparable<State>{
 
   public void placeStoneInFront() {
     numStones--;
+    addWaterWay();
     Coordinate stoneLocation = new Coordinate(location.getX(), location.getY());
     stoneLocation.takeStep(direction);
     stoneLocations.add(stoneLocation);
@@ -133,7 +153,7 @@ public class State implements Comparable<State>{
 
   // Best by number of actions it takes.
   private int getCost(){
-    return numActions;
+    return totalCost;
   }
 
   private void turnLeft() {
