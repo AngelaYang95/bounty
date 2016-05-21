@@ -37,22 +37,41 @@
  *       without using stones. This is an A* search with Manhattan Distance
  *       Heuristic.
  *    4. Explore new territory A. This search will result in AI going deep into
- *       an area. It only looks at the what is reachable in front of it.
+ *       an area. It only looks at the what is immediately in front of it.
  *       It picks least number of moves to spot UNKNOWN, but also has tendency
  *       to move in straight line and cover more ground. It is a uniform cost
  *       search.
  *    5. Gold has been seen & we're holding stones -> Search for a journey to
  *       GOLD using the stones we have. Stones are precious so we will only
  *       deploy them if we can find a path to GOLD. This search is recursive.
- *       The waterHeuristic calculates the state cost by number of stones used
- *       since for every location, we want to take the path to get there with
- *       least number of stones. Everytime a tool is picked up, the search
- *       recurses as a means to forward check that.
+ *       The waterHeuristic calculates the state cost by number of stones used.
+ *       For every location, we want to get there with the least number of
+ *       stones. Everytime a tool is picked up, the search recurses to see if it
+ *       to see if it can win. Ultimately we're trying to forward check that
+ *       how to use the stones to win.
  *    6. Explore new territory B. This search will result in AI doing a shallow
  *       but thorough search. Search B looks for any UNKNOWNS within the area
  *       of the 5 x 5 view.
  *    7. If none of the above works, the agent chooses a random action that
  *       won't result in it dying.
+ *
+ *  Design/ Algorithm decisions:
+ *    Initially the agent's the path search for gold and tools was a
+ *    bi-directional search. This was effective on maze like problem,
+ *    particularly ones that required a lot of moving away from a destination
+ *    before moving closer. Stitching the two paths of actions was quite
+ *    labourious in the end because of the way an agent passes through a tree or
+ *    door. It was also quite difficult to include the picking up
+ *    of stones into this and if an item was surrounded by water, the
+ *    bi-directional would simply be one uniform cost search. This was changed
+ *    to an A* which made including stones a lot easier. We also have two
+ *    different searches for exploring. We want the agent to explore more ground
+ *    quickly in the beginning. But if nothing is turning up then we want it to
+ *    to be thorough in it's search for new areas. This way it doesn't get stuck
+ *    in one area for too long. Since the pathToWin search is recursive, it's
+ *    very expensive, so we have put it after the first explorer search.
+ *    In each search a path is a sequence of moves not a list of coordinates.
+ *    This was easier for agent to act on.
  */
 
 import java.util.*;
@@ -641,7 +660,7 @@ public class Agent {
    }
 
    //______________________________
-   // PRINT FUNCTIONS TO BE REMOVED
+   // PRINTS FOR DEBUG.
    //______________________________
    /**
     * Prints to console everything the AI knows about its environment.
