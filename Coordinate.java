@@ -1,11 +1,11 @@
 /*
- * State.java
+ * Coordinate.java
  *
  * 06/05/2016
  */
 
 /**
- * Keeps x and y map coordinates.
+ * Structure to encapsulate x and y map coordinates.
  */
 public class Coordinate {
 

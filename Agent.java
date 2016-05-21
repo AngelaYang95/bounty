@@ -1,50 +1,59 @@
 /*********************************************
  *  COMP3411 Artificial Intelligence
  *  UNSW Session 1, 2016
- *  Tom He & Angela Yang
+ *  Angela Yang z5019922 & Tom(Jinyuan) He z3484364
  *  Group 84
  */
 
-/*
-QUESTION ANSWER:
-The agent keeps information of the game state in the following structures:
-  - Agent keeps it's own copy of the game terrain in worldMap[][] which is 4 times
-    the max game size. The agent always starts in the middle of the world map.
-    All locations where the agent hasn't seen yet are marked as UNKNOWN. Each
-    5 x 5 views is mapped onto worldMap[][] relative to agent's current
-    direction and position.
-  - The tools it currently has in Map<> Inventory excluding stones.
-  - The number of stones we have on hand.
-  - Coordinate location of spotted axes, keys or stones; each in their own Set.
-  - Whether the gold has been seen & whether we have the gold in hand.
-  - The agent's initial location which will always be the middle of the worldMap.
-
-Logic Flow:
-The agent first scans in the 5 x 5 view of the game and updates itself with new
-information.
-The agent keeps a List<>journey of actions it should take. The agent takes the
-first action off that list. The agent has a series of search methods to populate
-the list if it is empty. All the searches are variations of A* searches or BFS.
-They are prioritise and called as follows:
-1. We're holding GOLD -> search for a journey back to original location.
-2. GOLD has been seen -> try search a journey to gold without using stones.
-   This is an A* search with Manhattan Distance Heuristic.
-3. Tools have been seen -> try search a journey to one of these tools without
-   using stones. This is an A* search with Manhattan Distance Heuristic.
-4. Explore new territory A. This search will result in AI going deep into an
-   area. It only looks at the what is reachable in front of it.
-5. Gold has been seen & we're holding stones -> Search for a journey to GOLD
-   using the stones we have. Stones are precious so we will only deploy them
-   if we can find a path to GOLD. This search is recursive.
-   The waterHeuristic calculates the state cost by number of stones used since
-   for every location, we want to take the path to get there with least number
-   of stones. Everytime a tool is picked up, the search recurses as a means to
-   forward check that
-6. Explore new territory B. This search will result in AI doing a shallow but
-   thorough search. We use this after A as a means to cover ground at the start.
-7. If none of the above worked, the agent chooses a random action that won't
-   result in it dying.
-*/
+/**
+ * QUESTION ANSWER:
+ * The agent keeps information of the game state in the following structures:
+ *  - Agent keeps it's own copy of the game terrain in worldMap[][] which is 4x
+ *    the max game size. The agent always starts in the middle of the world map.
+ *    All locations where the agent hasn't seen yet are marked as UNKNOWN. Each
+ *    5 x 5 views is mapped onto worldMap[][] relative to agent's current
+ *    direction and position.
+ *  - Map<> Inventory stores the tools it currently has excluding stones.
+ *  - Agent keeps count of the number of stones it has picked up.
+ *  - Coordinate location of spotted axes, keys or stones; each in their own Set.
+ *  - Whether the gold has been seen & whether we have the gold in hand.
+ *  - The agent's initial location which will always be the middle of the
+ *    worldMap.
+ *
+ *
+ *  Logic Flow:
+ *  The agent first scans in the 5 x 5 view of the game and updates itself with
+ *  new information.
+ *  The agent keeps a List<>journey of actions it should take. The agent takes
+ *  the first action off that list. The agent has a series of search methods to
+ *  populate the list if it is empty. All the searches are variations of A*
+ *  searches or Uniform-cost search.
+ *  They are prioritise and called as follows:
+ *    1. We're holding GOLD -> search for a journey back to original location.
+ *       This is an astar using Manhattan Distance Heuristic.
+ *    2. GOLD has been seen -> try search for a journey to the gold without
+ *       using stones. This is an A* search with Manhattan Distance Heuristic.
+ *    3. Tools have been seen -> try search a journey to one of these tools
+ *       without using stones. This is an A* search with Manhattan Distance
+ *       Heuristic.
+ *    4. Explore new territory A. This search will result in AI going deep into
+ *       an area. It only looks at the what is reachable in front of it.
+ *       It picks least number of moves to spot UNKNOWN, but also has tendency
+ *       to move in straight line and cover more ground. It is a uniform cost
+ *       search.
+ *    5. Gold has been seen & we're holding stones -> Search for a journey to
+ *       GOLD using the stones we have. Stones are precious so we will only
+ *       deploy them if we can find a path to GOLD. This search is recursive.
+ *       The waterHeuristic calculates the state cost by number of stones used
+ *       since for every location, we want to take the path to get there with
+ *       least number of stones. Everytime a tool is picked up, the search
+ *       recurses as a means to forward check that.
+ *    6. Explore new territory B. This search will result in AI doing a shallow
+ *       but thorough search. Search B looks for any UNKNOWNS within the area
+ *       of the 5 x 5 view.
+ *    7. If none of the above works, the agent chooses a random action that
+ *       won't result in it dying.
+ */
 
 import java.util.*;
 import java.io.*;
@@ -69,6 +78,7 @@ public class Agent {
    final static char TURN_RIGHT = 'r';
    final static char CUT_DOWN = 'c';
    final static char OPEN_DOOR = 'u';
+   final static char[] choiceOfMoves = {MOVE_FORWARD, TURN_LEFT, TURN_RIGHT};
 
    final static char STEPPING_STONE = 'o';
    final static char AXE = 'a';
@@ -82,26 +92,23 @@ public class Agent {
    final static char DOOR = '-';
    final static char OUT = '.';
 
+   private final Coordinate initialLocation = new Coordinate(AGENT_START_INDEX,
+                                                             AGENT_START_INDEX);
    private char[][] worldMap = new char[WORLD_MAP_LENGTH][WORLD_MAP_LENGTH];
-   private Coordinate initialLocation;
-   char[] choiceOfMoves = {MOVE_FORWARD, TURN_LEFT, TURN_RIGHT};
 
    // Current position and direction of the agent.
    private int currRow,currCol,currDir;
 
    // Equipment the agent is currently holding.
-   Map<Character, Boolean> inventory = new TreeMap<Character, Boolean>();
+   private Map<Character, Boolean> inventory = new TreeMap<Character, Boolean>();
    private int numStones;
-   // Currently only tracks location of 1 of each type.
    private Map<Character, Coordinate> spottedTools = new HashMap<>();
    private Coordinate goldPosition;
    private boolean goldSeen;
 
    private LinkedList<Character> journey = new LinkedList<>();
-   private int numShown;
 
    public Agent() {
-     initialLocation = new Coordinate(AGENT_START_INDEX, AGENT_START_INDEX);
 	   currRow = AGENT_START_INDEX;
 	   currCol = AGENT_START_INDEX;
 	   currDir = NORTH;
@@ -110,8 +117,6 @@ public class Agent {
      inventory.put(GOLD, false);
 	   numStones = 0;
      goldSeen = false;
-
-     numShown = 0;
 	   for(char[] row: worldMap) { // Initialize the World Map to be all UNKNOWNs.
 		   Arrays.fill(row, UNKNOWN);
 	   }
@@ -121,20 +126,7 @@ public class Agent {
     * Given a view of it's surroundings, returns an action.
     */
    public char get_action( char view[][] ) {
-     if(numShown == 25) {
-       numShown = 0;
-       System.out.print("Next 25 steps");
-       try {
-       	 System.in.read();
-       }
-       catch (IOException e) {
-          System.out.println ("IO error:" + e );
-       }
-     }
-
 	  scanView(view);
-    numShown++;
-
     char action = TURN_LEFT;
     if(journey.isEmpty()) {
       Coordinate currentLocation = new Coordinate(currRow, currCol);
@@ -143,21 +135,18 @@ public class Agent {
       // Look for path back to initialLocation.
       if(inventory.get(GOLD)) {
         path = findPathToCoordinate(currentLocation, initialLocation);
-        createJourney(path);
       }
 
       // Look for path to GOLD.
       if(path.isEmpty() && goldSeen) {
         path = findPathToCoordinate(currentLocation, goldPosition);
-        createJourney(path);
       }
 
       // Look for path to tools.
       if (path.isEmpty() && !spottedTools.keySet().isEmpty()) {
         for(Map.Entry<Character, Coordinate> entry : spottedTools.entrySet()) {
           path = findPathToCoordinate(currentLocation, entry.getValue());
-          if(path != "") {
-            createJourney(path);
+          if(!path.isEmpty()) {
             break;
           }
         }
@@ -166,7 +155,6 @@ public class Agent {
       // Look for path to UNKNOWN using strategy A.
       if(path.isEmpty()) {
         path = exploreA(currentLocation);
-        createJourney(path);
       }
 
       // Try to find path to gold that uses stones.
@@ -174,19 +162,18 @@ public class Agent {
         path = pathToWin(currentLocation, currDir, numStones,
                          inventory.get(AXE), inventory.get(KEY),
                          new LinkedList<>(), new LinkedList<>());
-        createJourney(path);
       }
 
       // Look for path to UNKNOWN using strategy B.
       if(path.isEmpty()) {
         path = exploreB(currentLocation);
-        createJourney(path);
       }
 
       // Choose random action if no paths are found above.
       if(path.isEmpty()) {
         action = getRandomAction();
       } else {
+        createJourney(path);
         action = journey.removeFirst();
       }
     } else {
@@ -430,13 +417,13 @@ public class Agent {
      StringBuilder path = new StringBuilder();
 
      State currAgentState = new State(from, dir, "", hasAxe, hasKey, stones);
-     currAgentState.addStoneLocations(stoneLocations);
-     currAgentState.addStonesHeld(stonesHeld);
+     currAgentState.setStoneLocations(stoneLocations);
+     currAgentState.setStonesHeld(stonesHeld);
      agentToVisit.add(currAgentState);
 
      currAgentState = new State(from, (dir + 2) % 4, "rr", hasAxe, hasKey, stones);
-     currAgentState.addStoneLocations(stoneLocations);
-     currAgentState.addStonesHeld(stonesHeld);
+     currAgentState.setStoneLocations(stoneLocations);
+     currAgentState.setStonesHeld(stonesHeld);
      agentToVisit.add(currAgentState);
 
      while(!agentToVisit.isEmpty()) {
@@ -518,7 +505,6 @@ public class Agent {
       Below are helper functions for searches.
      _____________________________________________
    */
-   // TODO: make coordinate map a private class.
    /**
     * Adds new valid states generated from either TURN_LEFT, MOVE_FORWARD,
     * TURN_RIGHT to the toVisit list.
@@ -546,9 +532,8 @@ public class Agent {
          Coordinate stateLoc = new Coordinate(x, y);
          State nextState = new State(stateLoc, prevDirection, actionSequence,
                                        hasAxe, hasKey, numSteppingStones);
-         nextState.addStoneLocations(currentState.getStoneLocations());
-         nextState.addStonesHeld(currentState.getStonesHeld());
-         nextState.updateWaterWay(currentState.getNumWaterWays());
+         nextState.setStoneLocations(currentState.getStoneLocations());
+         nextState.setStonesHeld(currentState.getStonesHeld());
          if(action == MOVE_FORWARD) {
            if (obj == TREE) {
               nextState.addMove(CUT_DOWN);
@@ -639,12 +624,8 @@ public class Agent {
                   }
                }
             }
-
-            agent.print_view(view); // COMMENT THIS OUT BEFORE SUBMISSION
-            agent.scanView(view);
-            agent.show_world(); // COMMENT THIS OUT BEFORE SUBMISSION
             action = agent.get_action(view);
-            out.write( action );
+            out.write(action);
          }
       }
       catch( IOException e ) {

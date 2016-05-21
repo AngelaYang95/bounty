@@ -1,3 +1,13 @@
+/*
+ * ActionsHeuristic.java
+ *
+ * 18/05/2016
+ */
+
+/**
+ * Calculates the cost of a state by the number of actions made so far and the
+ * manhattan distance left till the destintion.
+ */
 public class ManhattanHeuristic implements IStrategy{
 
   private Coordinate destination;
