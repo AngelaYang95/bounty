@@ -180,7 +180,8 @@ public class Agent {
       if(path.isEmpty() && goldSeen && numStones > 0) {
         path = pathToWin(currentLocation, currDir, numStones,
                          inventory.get(AXE), inventory.get(KEY),
-                         new LinkedList<>(), new LinkedList<>());
+                         new LinkedList<Coordinate>(), 
+                         new LinkedList<Coordinate>());
       }
 
       // Look for path to UNKNOWN using strategy B.
